@@ -645,9 +645,11 @@ class HttpConnection implements IConnection {
     }
 
     if (_sendQueue != null) {
-      _sendQueue!.stop()!.catchError((e) {
-        _logger?.severe("TransportSendQueue.stop() threw error '$e'.");
-      });
+      try {
+          await _sendQueue!.stop();
+        } catch (_) {
+          _logger?.severe("TransportSendQueue.stop() threw an error.");
+        }
       _sendQueue = null;
     }
 
