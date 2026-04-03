@@ -645,15 +645,13 @@ class HttpConnection implements IConnection {
     }
 
     if (_sendQueue != null) {
-      try {
-          _sendQueue!.stop();
-        } catch (_) {
-          _logger?.severe("TransportSendQueue.stop() threw an error.");
-        }
+      _sendQueue!.stop()?.catchError((Object _) {
+        _logger?.severe("TransportSendQueue.stop() threw an error.");
+      });
       _sendQueue = null;
     }
 
-    connectionId = null;
+     connectionId = null;
     _connectionState = ConnectionState.Disconnected;
 
     if (_connectionStarted) {
