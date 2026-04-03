@@ -683,11 +683,12 @@ class HubConnection {
   }
 
   void _serverTimeout(Timer t) {
-    // The server hasn't talked to us in a while. It doesn't like us anymore ... :(
-    // Terminate the connection, but we don't need to wait on the promise.
     _connection.stop(
         error: GeneralError(
-            "Server timeout elapsed without receiving a message from the server."));
+            "Server timeout elapsed without receiving a message from the server."))
+        ?.catchError((Object _) {
+      _logger?.finer("Error during server timeout stop: $_");
+    });
   }
 
   void _invokeClientMethod(InvocationMessage invocationMessage) {
