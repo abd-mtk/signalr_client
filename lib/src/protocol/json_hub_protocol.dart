@@ -10,7 +10,7 @@ import 'text_message_format.dart';
 
 const String JSON_HUB_PROTOCOL_NAME = "json";
 const int PROTOCOL_VERSION = 1;
-const TransferFormat TRANSFER_FORMAT = TransferFormat.Text;
+const TransferFormat TRANSFER_FORMAT = TransferFormat.text;
 
 class JsonHubProtocol implements IHubProtocol {
   // Properties
@@ -34,8 +34,8 @@ class JsonHubProtocol implements IHubProtocol {
   @override
   List<HubMessageBase> parseMessages(Object input, Logger logger) {
     // Only JsonContent is allowed.
-    if (!(input is String)) {
-      throw new GeneralError(
+    if (input is! String) {
+      throw GeneralError(
           "Invalid input for JSON hub protocol. Expected a string.");
     }
 
@@ -50,22 +50,22 @@ class JsonHubProtocol implements IHubProtocol {
       HubMessageBase messageObj;
 
       switch (messageType) {
-        case MessageType.Invocation:
+        case MessageType.invocation:
           messageObj = _getInvocationMessageFromJson(jsonData);
           break;
-        case MessageType.StreamInvocation:
+        case MessageType.streamInvocation:
           messageObj = _getStreamInvocationMessageFromJson(jsonData);
           break;
-        case MessageType.StreamItem:
+        case MessageType.streamItem:
           messageObj = _getStreamItemMessageFromJson(jsonData);
           break;
-        case MessageType.Completion:
+        case MessageType.completion:
           messageObj = _getCompletionMessageFromJson(jsonData);
           break;
-        case MessageType.Ping:
+        case MessageType.ping:
           messageObj = _getPingMessageFromJson(jsonData);
           break;
-        case MessageType.Close:
+        case MessageType.close:
           messageObj = _getCloseMessageFromJson(jsonData);
           break;
         default:
@@ -138,8 +138,7 @@ class JsonHubProtocol implements IHubProtocol {
     _assertNotEmptyString(
         message.target, "Invalid payload for StreamInvocation message.");
     if (message.invocationId != null) {
-      _assertNotEmptyString(
-          message.invocationId,
+      _assertNotEmptyString(message.invocationId,
           "Invalid payload for StreamInvocation message.");
     }
 
@@ -201,7 +200,7 @@ class JsonHubProtocol implements IHubProtocol {
   ///
   @override
   String writeMessage(HubMessageBase message) {
-    var jsonObj = _messageAsMap(message);
+    final jsonObj = _messageAsMap(message);
     return TextMessageFormat.write(json.encode(jsonObj));
   }
 
@@ -210,7 +209,7 @@ class JsonHubProtocol implements IHubProtocol {
       throw GeneralError("Cannot encode message which is null.");
     }
 
-    if (!(message is HubMessageBase)) {
+    if (message is! HubMessageBase) {
       throw GeneralError(
         "Cannot encode message of type '${message.runtimeType}'.",
       );
@@ -255,7 +254,7 @@ class JsonHubProtocol implements IHubProtocol {
           "Completion message must contain either 'error' or 'result'.",
         );
       }
-      var r = {
+      final r = {
         "type": messageType,
         "invocationId": message.invocationId,
         "headers": message.headers.asMap,

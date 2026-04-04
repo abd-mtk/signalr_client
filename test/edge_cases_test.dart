@@ -41,7 +41,7 @@ void main() {
     });
 
     test('custom delays: stops at appended null sentinel', () {
-      final policy = DefaultRetryPolicy(retryDelays: [100, 200]);
+      final policy = DefaultRetryPolicy(retryDelays: [100, 200], jitterFactor: 0.0);
       expect(policy.nextRetryDelayInMilliseconds(
             RetryContext(0, 0, GeneralError('a')),
           ),

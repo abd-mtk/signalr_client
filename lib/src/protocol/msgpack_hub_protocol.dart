@@ -9,7 +9,7 @@ import 'ihub_protocol.dart';
 
 const String MSGPACK_HUB_PROTOCOL_NAME = "messagepack";
 const int PROTOCOL_VERSION = 1;
-const TransferFormat TRANSFER_FORMAT = TransferFormat.Binary;
+const TransferFormat TRANSFER_FORMAT = TransferFormat.binary;
 
 class MessagePackHubProtocol implements IHubProtocol {
   @override
@@ -26,8 +26,8 @@ class MessagePackHubProtocol implements IHubProtocol {
 
   @override
   List<HubMessageBase> parseMessages(Object input, Logger logger) {
-    if (!(input is Uint8List)) {
-      throw new GeneralError(
+    if (input is! Uint8List) {
+      throw GeneralError(
           "Invalid input for MessagePack hub protocol. Expected an Uint8List.");
     }
 
@@ -66,39 +66,44 @@ class MessagePackHubProtocol implements IHubProtocol {
   }
 
   static HubMessageBase? _parseMessage(List<dynamic> data, Logger logger) {
-    if (data.length == 0) {
-      throw new GeneralError("Invalid payload.");
+    if (data.isEmpty) {
+      throw GeneralError("Invalid payload.");
     }
     HubMessageBase? messageObj;
 
-    final messageType = data[0] as int;
+    final rawType = data[0];
+    if (rawType is! int) {
+      throw GeneralError(
+          "Invalid message type value: expected int, got ${rawType.runtimeType}.");
+    }
+    final messageType = rawType;
 
-    if (messageType == MessageType.Invocation.index) {
+    if (messageType == MessageType.invocation.index) {
       messageObj = _createInvocationMessage(data);
       return messageObj;
     }
 
-    if (messageType == MessageType.StreamInvocation.index) {
+    if (messageType == MessageType.streamInvocation.index) {
       messageObj = _createStreamInvocationMessage(data);
       return messageObj;
     }
 
-    if (messageType == MessageType.StreamItem.index) {
+    if (messageType == MessageType.streamItem.index) {
       messageObj = _createStreamItemMessage(data);
       return messageObj;
     }
 
-    if (messageType == MessageType.Completion.index) {
+    if (messageType == MessageType.completion.index) {
       messageObj = _createCompletionMessage(data);
       return messageObj;
     }
 
-    if (messageType == MessageType.Ping.index) {
+    if (messageType == MessageType.ping.index) {
       messageObj = _createPingMessage(data);
       return messageObj;
     }
 
-    if (messageType == MessageType.Close.index) {
+    if (messageType == MessageType.close.index) {
       messageObj = _createCloseMessage(data);
       return messageObj;
     } else {
@@ -132,16 +137,20 @@ class MessagePackHubProtocol implements IHubProtocol {
       throw GeneralError("Invalid payload for Invocation message.");
     }
 
-    final MessageHeaders? headers = createMessageHeaders(data);
+    final MessageHeaders headers = createMessageHeaders(data);
 
-    final message = InvocationMessage(
+    final rawArgs = data[4];
+    if (rawArgs is! List) {
+      throw GeneralError(
+          "Invalid payload for Invocation message: arguments must be a List.");
+    }
+
+    return InvocationMessage(
         target: data[3] as String?,
         headers: headers,
         invocationId: data[2] as String?,
         streamIds: [],
-        arguments: List<Object?>.from(data[4] as List));
-
-    return message;
+        arguments: List<Object?>.from(rawArgs));
   }
 
   static StreamInvocationMessage _createStreamInvocationMessage(
@@ -150,14 +159,20 @@ class MessagePackHubProtocol implements IHubProtocol {
       throw GeneralError("Invalid payload for StreamInvocation message.");
     }
 
-    final MessageHeaders? headers = createMessageHeaders(data);
+    final MessageHeaders headers = createMessageHeaders(data);
+
+    final rawArgs = data[4];
+    if (rawArgs is! List) {
+      throw GeneralError(
+          "Invalid payload for StreamInvocation message: arguments must be a List.");
+    }
 
     return StreamInvocationMessage(
       target: data[3] as String?,
       headers: headers,
       invocationId: data[2] as String?,
-      arguments: List<Object?>.from(data[4] as List),
-      streamIds: data.length > 5
+      arguments: List<Object?>.from(rawArgs),
+      streamIds: data.length > 5 && data[5] is List
           ? List<String>.from(data[5] as List)
           : null,
     );
@@ -167,7 +182,7 @@ class MessagePackHubProtocol implements IHubProtocol {
     if (data.length < 4) {
       throw GeneralError("Invalid payload for StreamItem message.");
     }
-    final MessageHeaders? headers = createMessageHeaders(data);
+    final MessageHeaders headers = createMessageHeaders(data);
     final message = StreamItemMessage(
       item: data[3] as Object?,
       headers: headers,
@@ -181,7 +196,7 @@ class MessagePackHubProtocol implements IHubProtocol {
     if (data.length < 4) {
       throw GeneralError("Invalid payload for Completion message.");
     }
-    final MessageHeaders? headers = createMessageHeaders(data);
+    final MessageHeaders headers = createMessageHeaders(data);
     final resultKind = data[3];
     if (resultKind != _voidResult && data.length < 5) {
       throw GeneralError("Invalid payload for Completion message.");
@@ -212,7 +227,7 @@ class MessagePackHubProtocol implements IHubProtocol {
   }
 
   static PingMessage _createPingMessage(List<dynamic> data) {
-    if (data.length < 1) {
+    if (data.isEmpty) {
       throw GeneralError("Invalid payload for Ping message.");
     }
     return PingMessage();
@@ -233,17 +248,17 @@ class MessagePackHubProtocol implements IHubProtocol {
   Object writeMessage(HubMessageBase message) {
     final messageType = message.type;
     switch (messageType) {
-      case MessageType.Invocation:
+      case MessageType.invocation:
         return _writeInvocation(message as InvocationMessage);
-      case MessageType.StreamInvocation:
+      case MessageType.streamInvocation:
         return _writeStreamInvocation(message as StreamInvocationMessage);
-      case MessageType.StreamItem:
+      case MessageType.streamItem:
         return _writeStreamItem(message as StreamItemMessage);
-      case MessageType.Completion:
+      case MessageType.completion:
         return _writeCompletion(message as CompletionMessage);
-      case MessageType.Ping:
+      case MessageType.ping:
         return _writePing();
-      case MessageType.CancelInvocation:
+      case MessageType.cancelInvocation:
         return _writeCancelInvocation(message as CancelInvocationMessage);
       default:
         throw GeneralError("Invalid message type.");
@@ -252,129 +267,75 @@ class MessagePackHubProtocol implements IHubProtocol {
     //throw GeneralError("Converting '${message.type}' is not implemented.");
   }
 
+  /// Serializes a payload list with MessagePack and wraps it in a binary frame.
+  static Uint8List _packAndFrame(List<dynamic> payload) {
+    return BinaryMessageFormat.write(msgpack.serialize(payload));
+  }
+
   static Uint8List _writeInvocation(InvocationMessage message) {
-    List<dynamic> payload;
-
-    if ((message.streamIds?.length ?? 0) > 0) {
-      payload = [
-        MessageType.Invocation.index,
-        message.headers.asMap,
-        message.invocationId,
-        message.target,
-        message.arguments,
-        message.streamIds
-      ];
-    } else {
-      payload = [
-        MessageType.Invocation.index,
-        message.headers.asMap,
-        message.invocationId,
-        message.target,
-        message.arguments,
-      ];
+    final payload = <dynamic>[
+      MessageType.invocation.index,
+      message.headers.asMap,
+      message.invocationId,
+      message.target,
+      message.arguments,
+    ];
+    if (message.streamIds != null && message.streamIds!.isNotEmpty) {
+      payload.add(message.streamIds);
     }
-
-    final packedData = msgpack.serialize(payload);
-    return BinaryMessageFormat.write(packedData);
+    return _packAndFrame(payload);
   }
 
   static Uint8List _writeStreamInvocation(StreamInvocationMessage message) {
-    List<dynamic> payload;
-
-    if ((message.streamIds?.length ?? 0) > 0) {
-      payload = [
-        MessageType.StreamInvocation.index,
-        message.headers.asMap,
-        message.invocationId,
-        message.target,
-        message.arguments,
-        message.streamIds
-      ];
-    } else {
-      payload = [
-        MessageType.StreamInvocation.index,
-        message.headers.asMap,
-        message.invocationId,
-        message.target,
-        message.arguments,
-      ];
+    final payload = <dynamic>[
+      MessageType.streamInvocation.index,
+      message.headers.asMap,
+      message.invocationId,
+      message.target,
+      message.arguments,
+    ];
+    if (message.streamIds != null && message.streamIds!.isNotEmpty) {
+      payload.add(message.streamIds);
     }
-
-    final packedData = msgpack.serialize(payload);
-    return BinaryMessageFormat.write(packedData);
+    return _packAndFrame(payload);
   }
 
   static Uint8List _writeStreamItem(StreamItemMessage message) {
-    List<dynamic> payload;
-
-    payload = [
-      MessageType.StreamItem.index,
+    return _packAndFrame([
+      MessageType.streamItem.index,
       message.headers.asMap,
       message.invocationId,
-      message.item
-    ];
-
-    final packedData = msgpack.serialize(payload);
-    return BinaryMessageFormat.write(packedData);
+      message.item,
+    ]);
   }
 
   static Uint8List _writeCompletion(CompletionMessage message) {
-    List<dynamic> payload;
     final resultKind = (message.error != null)
         ? _errorResult
         : (message.result != null)
             ? _nonVoidResult
             : _voidResult;
-    if (resultKind == _errorResult) {
-      payload = [
-        MessageType.Completion.index,
-        message.headers.asMap,
-        message.invocationId,
-        resultKind,
-        message.error
-      ];
-    } else if (resultKind == _nonVoidResult) {
-      payload = [
-        MessageType.Completion.index,
-        message.headers.asMap,
-        message.invocationId,
-        resultKind,
-        message.result
-      ];
-    } else {
-      payload = [
-        MessageType.Completion.index,
-        message.headers.asMap,
-        message.invocationId,
-        resultKind
-      ];
+    final payload = <dynamic>[
+      MessageType.completion.index,
+      message.headers.asMap,
+      message.invocationId,
+      resultKind,
+    ];
+    if (resultKind != _voidResult) {
+      payload.add(resultKind == _errorResult ? message.error : message.result);
     }
-
-    final packedData = msgpack.serialize(payload);
-    return BinaryMessageFormat.write(packedData);
+    return _packAndFrame(payload);
   }
 
   static Uint8List _writeCancelInvocation(CancelInvocationMessage message) {
-    List<dynamic> payload;
-
-    payload = [
-      MessageType.CancelInvocation.index,
+    return _packAndFrame([
+      MessageType.cancelInvocation.index,
       message.headers.asMap,
       message.invocationId,
-    ];
-
-    final packedData = msgpack.serialize(payload);
-    return BinaryMessageFormat.write(packedData);
+    ]);
   }
 
   static Uint8List _writePing() {
-    List<dynamic> payload;
-
-    payload = [
-      MessageType.Ping.index,
-    ];
-
-    final packedData = msgpack.serialize(payload);
-    return BinaryMessageFormat.write(packedData);
+    return _packAndFrame([MessageType.ping.index]);
   }
 }

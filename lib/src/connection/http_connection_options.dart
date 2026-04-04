@@ -17,6 +17,12 @@ class HttpConnectionOptions extends Equatable {
   final bool skipNegotiation;
   final int requestTimeout;
 
+  /// Maximum number of negotiate redirects before giving up. Default: 100.
+  final int maxRedirects;
+
+  /// Timeout in milliseconds for long polling requests. Default: 100000 (100s).
+  final int longPollingTimeoutMs;
+
   HttpConnectionOptions({
     this.httpClient,
     this.transport,
@@ -26,6 +32,8 @@ class HttpConnectionOptions extends Equatable {
     this.logMessageContent = false,
     this.skipNegotiation = false,
     this.requestTimeout = 2000,
+    this.maxRedirects = 100,
+    this.longPollingTimeoutMs = 100000,
   }) : logger = resolveSignalRLogger(logger);
 
   HttpConnectionOptions copyWith({
@@ -37,6 +45,8 @@ class HttpConnectionOptions extends Equatable {
     bool? logMessageContent,
     bool? skipNegotiation,
     int? requestTimeout,
+    int? maxRedirects,
+    int? longPollingTimeoutMs,
   }) {
     return HttpConnectionOptions(
       httpClient: httpClient ?? this.httpClient,
@@ -47,6 +57,8 @@ class HttpConnectionOptions extends Equatable {
       logMessageContent: logMessageContent ?? this.logMessageContent,
       skipNegotiation: skipNegotiation ?? this.skipNegotiation,
       requestTimeout: requestTimeout ?? this.requestTimeout,
+      maxRedirects: maxRedirects ?? this.maxRedirects,
+      longPollingTimeoutMs: longPollingTimeoutMs ?? this.longPollingTimeoutMs,
     );
   }
 
@@ -60,5 +72,7 @@ class HttpConnectionOptions extends Equatable {
         logMessageContent,
         skipNegotiation,
         requestTimeout,
+        maxRedirects,
+        longPollingTimeoutMs,
       ];
 }

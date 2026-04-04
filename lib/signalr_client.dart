@@ -1,4 +1,4 @@
-library signalr_client;
+library;
 
 export 'src/core/abort_controller.dart';
 export 'src/core/errors.dart';

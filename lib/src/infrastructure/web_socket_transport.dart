@@ -59,9 +59,7 @@ class WebSocketTransport implements ITransport {
       if (!isStringEmpty(token)) {
         if (kIsWeb) {
           final encodedToken = Uri.encodeComponent(token);
-          connectUrl = connectUrl +
-              (connectUrl.contains('?') ? '&' : '?') +
-              "access_token=$encodedToken";
+          connectUrl = "$connectUrl${connectUrl.contains('?') ? '&' : '?'}access_token=$encodedToken";
         } else {
           headers = Map<String, String>.from(headers);
           headers['Authorization'] = 'Bearer $token';
@@ -72,7 +70,8 @@ class WebSocketTransport implements ITransport {
     final websocketCompleter = Completer<void>();
     var opened = false;
     final wsUrl = normalizeWebSocketConnectUrl(connectUrl);
-    _logger.finest("WebSocket try connecting to '$wsUrl'.");
+    final safeUrl = sanitizeUrlForLogging(wsUrl);
+    _logger.finest("WebSocket try connecting to '$safeUrl'.");
 
     try {
       final WebSocketChannel channel;
@@ -91,7 +90,7 @@ class WebSocketTransport implements ITransport {
         websocketCompleter.complete();
       }
       _connectFutureCompleted = true;
-      _logger.info("WebSocket connected to '$wsUrl'.");
+      _logger.info("WebSocket connected to '$safeUrl'.");
 
       _webSocketListenSub = channel.stream.listen(
         (Object? message) {
@@ -143,7 +142,7 @@ class WebSocketTransport implements ITransport {
       if (!websocketCompleter.isCompleted) {
         websocketCompleter.completeError(toSignalRException(e, st));
       }
-      _logger.severe("WebSocket connection to '$wsUrl' failed: $e");
+      _logger.severe("WebSocket connection to '$safeUrl' failed: $e");
     }
 
     return websocketCompleter.future;

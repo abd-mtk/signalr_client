@@ -5,9 +5,7 @@ class HttpError implements Exception {
 
   final String? message;
 
-  HttpError(String? errorMessage, num statusCode)
-      : message = errorMessage,
-        statusCode = statusCode;
+  HttpError(String? errorMessage, this.statusCode) : message = errorMessage;
 
   @override
   String toString() {
@@ -32,7 +30,7 @@ class TimeoutError implements Exception {
 class AbortError implements Exception {
   final String message;
 
-  AbortError([String message = "An abort occurred."]) : message = message;
+  AbortError([this.message = "An abort occurred."]);
 
   @override
   String toString() {
@@ -58,7 +56,7 @@ class NotImplementedException extends GeneralError {
 }
 
 class InvalidPayloadException extends GeneralError {
-  InvalidPayloadException(String errorMessage) : super(errorMessage);
+  InvalidPayloadException(String super.errorMessage);
 
   @override
   String toString() => message ?? 'Invalid payload';

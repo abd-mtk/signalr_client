@@ -4,10 +4,10 @@ import '../core/itransport.dart';
 import '../shared/utils.dart';
 
 enum ConnectionState {
-  Connecting,
-  Connected,
-  Disconnected,
-  Disconnecting,
+  connecting,
+  connected,
+  disconnected,
+  disconnecting,
 }
 
 class NegotiateResponse {

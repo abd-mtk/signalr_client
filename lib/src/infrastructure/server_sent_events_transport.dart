@@ -28,7 +28,7 @@ class ServerSentEventsTransport implements ITransport {
   ServerSentEventsTransport(
     SignalRHttpClient httpClient,
     AccessTokenFactory? accessTokenFactory,
-      Logger logger,
+    Logger logger,
     bool logMessageContent,
   )   : _httpClient = httpClient,
         _accessTokenFactory = accessTokenFactory,
@@ -39,8 +39,7 @@ class ServerSentEventsTransport implements ITransport {
     if (_onCloseRaised) return;
     _onCloseRaised = true;
 
-    final Exception? ex =
-        error == null ? null : toSignalRException(error, st);
+    final Exception? ex = error == null ? null : toSignalRException(error, st);
     onClose?.call(error: ex);
   }
 
@@ -59,13 +58,12 @@ class ServerSentEventsTransport implements ITransport {
       final token = await tokenFactory();
       if (!isStringEmpty(token)) {
         final encodedToken = Uri.encodeComponent(token);
-        connectUrl = connectUrl +
-            (connectUrl.contains('?') ? '&' : '?') +
-            "access_token=$encodedToken";
+        connectUrl =
+            "$connectUrl${connectUrl.contains('?') ? '&' : '?'}access_token=$encodedToken";
       }
     }
 
-    if (transferFormat != TransferFormat.Text) {
+    if (transferFormat != TransferFormat.text) {
       return Future.error(
         GeneralError(
           "The Server-Sent Events transport only supports the 'Text' transfer format",
@@ -75,7 +73,8 @@ class ServerSentEventsTransport implements ITransport {
 
     try {
       final client = SseChannel.connect(Uri.parse(connectUrl));
-      _logger.finer('(SSE transport) connected to $connectUrl');
+      _logger.finer(
+          '(SSE transport) connected to ${sanitizeUrlForLogging(connectUrl)}');
       _sseClient = client;
 
       _subscription = client.stream.listen(

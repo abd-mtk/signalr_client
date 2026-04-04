@@ -104,7 +104,7 @@ class ChatPageViewModel extends ViewModel {
       _hubConnection!.on("OnMessage", _handleIncommingChatMessage);
     }
 
-    if (_hubConnection!.state != HubConnectionState.Connected) {
+    if (_hubConnection!.state != HubConnectionState.connected) {
       await _hubConnection!.start();
       connectionIsOpen = true;
     }

@@ -18,8 +18,6 @@ import 'negotiate_models.dart';
 import 'transport_send_queue.dart';
 
 class HttpConnection implements IConnection {
-  static final maxRedirects = 100;
-
   ConnectionState? _connectionState;
   late bool _connectionStarted;
   late SignalRHttpClient _httpClient;
@@ -48,43 +46,43 @@ class HttpConnection implements IConnection {
   @override
   OnClose? onclose;
 
-  int _negotiateVersion = 1;
+  final int _negotiateVersion = 1;
 
   HttpConnection(String url, {required HttpConnectionOptions options})
       : _logger = options.logger {
     baseUrl = url;
     _options = options;
     _httpClient = options.httpClient ?? WebSupportingHttpClient(_logger);
-    _connectionState = ConnectionState.Disconnected;
+    _connectionState = ConnectionState.disconnected;
     _connectionStarted = false;
   }
 
   @override
   Future<void> start({TransferFormat? transferFormat}) async {
-    transferFormat = transferFormat ?? TransferFormat.Binary;
+    transferFormat = transferFormat ?? TransferFormat.binary;
 
     _logger.finer(
       "Starting connection with transfer format '$transferFormat'.",
     );
 
-    if (_connectionState != ConnectionState.Disconnected) {
+    if (_connectionState != ConnectionState.disconnected) {
       return Future.error(GeneralError(
         "Cannot start a connection that is not in the 'Disconnected' state.",
       ));
     }
 
-    _connectionState = ConnectionState.Connecting;
+    _connectionState = ConnectionState.connecting;
 
     _startInternalPromise = _startInternal(transferFormat);
     await _startInternalPromise;
 
-    if (_connectionState == ConnectionState.Disconnecting) {
+    if (_connectionState == ConnectionState.disconnecting) {
       const message =
           "Failed to start the HttpConnection before stop() was called.";
       _logger.severe(message);
       await _stopPromise;
       return Future.error(GeneralError(message));
-    } else if (_connectionState != ConnectionState.Connected) {
+    } else if (_connectionState != ConnectionState.connected) {
       const message =
           "HttpConnection.startInternal completed gracefully but didn't enter the connection into the connected state!";
       _logger.severe(message);
@@ -96,7 +94,7 @@ class HttpConnection implements IConnection {
 
   @override
   Future<void> send(Object? data) {
-    if (_connectionState != ConnectionState.Connected) {
+    if (_connectionState != ConnectionState.connected) {
       return Future.error(GeneralError(
         "Cannot send data if the connection is not in the 'Connected' State.",
       ));
@@ -118,24 +116,23 @@ class HttpConnection implements IConnection {
 
   @override
   Future<void>? stop({Object? error}) async {
-    final Exception? ex =
-        error == null ? null : toSignalRException(error);
+    final Exception? ex = error == null ? null : toSignalRException(error);
 
-    if (_connectionState == ConnectionState.Disconnected) {
+    if (_connectionState == ConnectionState.disconnected) {
       _logger.finer(
         "Call to HttpConnection.stop($error) ignored because the connection is already in the disconnected state.",
       );
       return Future.value();
     }
 
-    if (_connectionState == ConnectionState.Disconnecting) {
+    if (_connectionState == ConnectionState.disconnecting) {
       _logger.finer(
         "Call to HttpConnection.stop($error) ignored because the connection is already in the disconnecting state.",
       );
       return _stopPromise;
     }
 
-    _connectionState = ConnectionState.Disconnecting;
+    _connectionState = ConnectionState.disconnecting;
 
     _stopPromiseCompleter = Completer<void>();
     _stopPromise = _stopPromiseCompleter.future;
@@ -183,8 +180,8 @@ class HttpConnection implements IConnection {
 
     try {
       if (_options.skipNegotiation) {
-        if (_options.transport == HttpTransportType.WebSockets) {
-          _transport = _constructTransport(HttpTransportType.WebSockets);
+        if (_options.transport == HttpTransportType.webSockets) {
+          _transport = _constructTransport(HttpTransportType.webSockets);
           await _startTransport(url, transferFormat);
         } else {
           throw GeneralError(
@@ -197,9 +194,10 @@ class HttpConnection implements IConnection {
 
         do {
           negotiateResponse = await _getNegotiationResponse(url);
-          if (_connectionState == ConnectionState.Disconnecting ||
-              _connectionState == ConnectionState.Disconnected) {
-            throw GeneralError("The connection was stopped during negotiation.");
+          if (_connectionState == ConnectionState.disconnecting ||
+              _connectionState == ConnectionState.disconnected) {
+            throw GeneralError(
+                "The connection was stopped during negotiation.");
           }
 
           if (negotiateResponse.isErrorResponse) {
@@ -221,9 +219,9 @@ class HttpConnection implements IConnection {
 
           redirects++;
         } while (negotiateResponse.isRedirectResponse &&
-            redirects < maxRedirects);
+            redirects < _options.maxRedirects);
 
-        if (redirects == maxRedirects &&
+        if (redirects == _options.maxRedirects &&
             negotiateResponse.isRedirectResponse) {
           throw GeneralError("Negotiate redirection limit exceeded.");
         }
@@ -245,13 +243,13 @@ class HttpConnection implements IConnection {
         }
       }
 
-      if (_connectionState == ConnectionState.Connecting) {
+      if (_connectionState == ConnectionState.connecting) {
         _logger.finer("The HttpConnection connected successfully.");
-        _connectionState = ConnectionState.Connected;
+        _connectionState = ConnectionState.connected;
       }
     } catch (e) {
       _logger.severe("Failed to start the connection: ${e.toString()}");
-      _connectionState = ConnectionState.Disconnected;
+      _connectionState = ConnectionState.disconnected;
       _transport = null;
       return Future.error(e);
     }
@@ -289,7 +287,7 @@ class HttpConnection implements IConnection {
         );
       }
 
-      var negotiateResponse =
+      final negotiateResponse =
           NegotiateResponse.fromJson(json.decode(response.content as String));
       final negotiateVersion = negotiateResponse.negotiateVersion;
       if (negotiateVersion == null || negotiateVersion < 1) {
@@ -315,7 +313,7 @@ class HttpConnection implements IConnection {
         'Cannot build connect URL with connection token without a base url.',
       );
     }
-    return base + (base.contains('?') ? '&' : '?') + "id=$connectionToken";
+    return "$base${base.contains('?') ? '&' : '?'}id=$connectionToken";
   }
 
   Future<void> _createTransport(
@@ -340,7 +338,7 @@ class HttpConnection implements IConnection {
     final transports = negotiateResponse.availableTransports ?? [];
     NegotiateResponse? negotiate = negotiateResponse;
     for (var endpoint in transports) {
-      _connectionState = ConnectionState.Connecting;
+      _connectionState = ConnectionState.connecting;
 
       try {
         _transport = _resolveTransport(
@@ -379,7 +377,7 @@ class HttpConnection implements IConnection {
         negotiate = null;
         transportExceptions.add("${endpoint.transport} failed: $ex");
 
-        if (_connectionState != ConnectionState.Connecting) {
+        if (_connectionState != ConnectionState.connecting) {
           const message =
               "Failed to select transport before stop() was called.";
           _logger.finer(message);
@@ -400,26 +398,27 @@ class HttpConnection implements IConnection {
 
   ITransport _constructTransport(HttpTransportType transport) {
     switch (transport) {
-      case HttpTransportType.WebSockets:
+      case HttpTransportType.webSockets:
         return WebSocketTransport(
           _accessTokenFactory,
           _logger,
           _options.logMessageContent,
           _options.headers,
         );
-      case HttpTransportType.ServerSentEvents:
+      case HttpTransportType.serverSentEvents:
         return ServerSentEventsTransport(
           _httpClient,
           _accessTokenFactory,
           _logger,
           _options.logMessageContent,
         );
-      case HttpTransportType.LongPolling:
+      case HttpTransportType.longPolling:
         return LongPollingTransport(
           _httpClient,
           _accessTokenFactory,
           _logger,
           _options.logMessageContent,
+          pollTimeoutMs: _options.longPollingTimeoutMs,
         );
       default:
         throw GeneralError("Unknown transport: $transport.");
@@ -487,14 +486,14 @@ class HttpConnection implements IConnection {
     error = _stopError ?? error;
     _stopError = null;
 
-    if (_connectionState == ConnectionState.Disconnected) {
+    if (_connectionState == ConnectionState.disconnected) {
       _logger.finer(
         "Call to HttpConnection.stopConnection($error) was ignored because the connection is already in the disconnected state.",
       );
       return;
     }
 
-    if (_connectionState == ConnectionState.Connecting) {
+    if (_connectionState == ConnectionState.connecting) {
       _logger.finer(
         "HttpConnection.stopConnection during Connecting; transitioning to Disconnected without throwing.",
       );
@@ -503,11 +502,11 @@ class HttpConnection implements IConnection {
       });
       _sendQueue = null;
       connectionId = null;
-      _connectionState = ConnectionState.Disconnected;
+      _connectionState = ConnectionState.disconnected;
       return;
     }
 
-    if (_connectionState == ConnectionState.Disconnecting) {
+    if (_connectionState == ConnectionState.disconnecting) {
       if (!_stopPromiseCompleter.isCompleted) {
         _stopPromiseCompleter.complete();
       }
@@ -524,8 +523,13 @@ class HttpConnection implements IConnection {
     });
     _sendQueue = null;
 
+    final client = _httpClient;
+    if (client is WebSupportingHttpClient) {
+      client.close();
+    }
+
     connectionId = null;
-    _connectionState = ConnectionState.Disconnected;
+    _connectionState = ConnectionState.disconnected;
 
     if (_connectionStarted) {
       _connectionStarted = false;
@@ -558,7 +562,6 @@ class HttpConnection implements IConnection {
     HttpTransportType? requestedTransport,
     HttpTransportType actualTransport,
   ) {
-    return requestedTransport == null ||
-        actualTransport == requestedTransport;
+    return requestedTransport == null || actualTransport == requestedTransport;
   }
 }

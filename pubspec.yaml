@@ -22,5 +22,6 @@ dev_dependencies:
   collection: ^1.19.1
   flutter_test:
     sdk: flutter
+  lints: ^5.1.1
   quiver: ^3.2.2
   rxdart: ^0.28.0

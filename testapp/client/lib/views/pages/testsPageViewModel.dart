@@ -42,7 +42,7 @@ class TestsPageViewModel extends ViewModel {
     _logMessagesSub = Logger.root.onRecord.listen(_handleLogMessage);
     _logger = Logger("TestsPageViewModel");
 
-    _serverUrl = kServerUrl + "/IntegrationTestHub";
+    _serverUrl = "$kServerUrl/IntegrationTestHub";
     _tests = Tests(_getHubConnection, _logger);
   }
 
@@ -65,9 +65,9 @@ class TestsPageViewModel extends ViewModel {
       final headers = MessageHeaders();
       headers.setHeaderValue("api-key", "my-top-secret-api-key");
       final httpOptions =
-          new HttpConnectionOptions(logger: logger, headers: headers);
-      //final httpOptions = new HttpConnectionOptions(logger: logger, transport: HttpTransportType.ServerSentEvents);
-      //final httpOptions = new HttpConnectionOptions(logger: logger, transport: HttpTransportType.LongPolling);
+          HttpConnectionOptions(logger: logger, headers: headers);
+      //final httpOptions = new HttpConnectionOptions(logger: logger, transport: HttpTransportType.serverSentEvents);
+      //final httpOptions = new HttpConnectionOptions(logger: logger, transport: HttpTransportType.longPolling);
 
       _hubConnection = HubConnectionBuilder()
           .withUrl(_serverUrl, options: httpOptions)
@@ -79,7 +79,7 @@ class TestsPageViewModel extends ViewModel {
       _hubConnection!.onclose(({error}) => _logger.info("Connection Closed"));
     }
 
-    if (_hubConnection!.state != HubConnectionState.Connected) {
+    if (_hubConnection!.state != HubConnectionState.connected) {
       await _hubConnection!.start();
       _logger.info("Connection state '${_hubConnection!.state}'");
     }

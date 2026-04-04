@@ -68,9 +68,9 @@ class HandshakeProtocol {
 
     if (data is Uint8List) {
       // Format is binary but still need to read JSON text from handshake response
-      int separatorIndex = data.indexOf(TextMessageFormat.RecordSeparatorCode);
+      final int separatorIndex = data.indexOf(TextMessageFormat.RecordSeparatorCode);
       if (separatorIndex == -1) {
-        throw new GeneralError("Message is incomplete.");
+        throw GeneralError("Message is incomplete.");
       }
 
       // content before separator is handshake response
@@ -85,7 +85,7 @@ class HandshakeProtocol {
       final separatorIndex =
           textData.indexOf(TextMessageFormat.recordSeparator);
       if (separatorIndex == -1) {
-        throw new GeneralError("Message is incomplete.");
+        throw GeneralError("Message is incomplete.");
       }
 
       // content before separator is handshake response

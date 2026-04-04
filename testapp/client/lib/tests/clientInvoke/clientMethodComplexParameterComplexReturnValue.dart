@@ -16,13 +16,13 @@ class ClientMethodComplexParameterComplexReturnValue extends Test {
 
   @override
   Future<void> executeTest(HubConnection hubConnection) async {
-    var reqParam =
-        new ComplexInParameter(firstName: 'Fred', lastName: 'Finstone');
+    final reqParam =
+        ComplexInParameter(firstName: 'Fred', lastName: 'Finstone');
     final jsonResult = await hubConnection.invoke(
         "MethodWithComplexParameterAndComplexReturnValue",
         args: <Object>[reqParam]);
     //args: <Object>[reqParam.toJson()]); //Convert object to map for msgpack
-    var resultObj =
+    final resultObj =
         ComplexReturnValue.fromJson(jsonResult as Map<String, dynamic>);
 
     logger.info("Result: '$resultObj");

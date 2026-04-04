@@ -14,11 +14,26 @@ typedef OnHttpClientCreateCallback = void Function(Client httpClient);
 class WebSupportingHttpClient extends SignalRHttpClient {
   final Logger _logger;
   final OnHttpClientCreateCallback? _httpClientCreateCallback;
+  Client? _persistentClient;
 
   WebSupportingHttpClient(
     this._logger, {
     OnHttpClientCreateCallback? httpClientCreateCallback,
   }) : _httpClientCreateCallback = httpClientCreateCallback;
+
+  Client _getOrCreateClient() {
+    if (_persistentClient != null) return _persistentClient!;
+    final client = Client();
+    _httpClientCreateCallback?.call(client);
+    _persistentClient = client;
+    return client;
+  }
+
+  /// Closes the underlying HTTP client. Call this when the connection is done.
+  void close() {
+    _persistentClient?.close();
+    _persistentClient = null;
+  }
 
   @override
   Future<SignalRHttpResponse> send(SignalRHttpRequest request) {
@@ -41,8 +56,7 @@ class WebSupportingHttpClient extends SignalRHttpClient {
     final abortSignal = request.abortSignal;
 
     return Future<SignalRHttpResponse>(() async {
-      final httpClient = Client();
-      _httpClientCreateCallback?.call(httpClient);
+      final httpClient = _getOrCreateClient();
 
       final abortFuture = Future<void>(() {
         final completer = Completer<void>();
@@ -122,8 +136,6 @@ class WebSupportingHttpClient extends SignalRHttpClient {
       } catch (e, st) {
         clearAbortHandler();
         throw toSignalRException(e, st);
-      } finally {
-        httpClient.close();
       }
     });
   }

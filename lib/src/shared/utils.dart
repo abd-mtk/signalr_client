@@ -89,6 +89,21 @@ String normalizeWebSocketConnectUrl(String urlString) {
   ).toString();
 }
 
+/// Removes sensitive query parameters (access_token) from a URL for safe logging.
+String sanitizeUrlForLogging(String url) {
+  try {
+    final uri = Uri.parse(url);
+    if (!uri.hasQuery) return url;
+    final sanitized = Map<String, String>.from(uri.queryParameters);
+    if (sanitized.containsKey('access_token')) {
+      sanitized['access_token'] = '***';
+    }
+    return uri.replace(queryParameters: sanitized).toString();
+  } catch (_) {
+    return url;
+  }
+}
+
 String getDataDetail(Object? data, bool includeContent) {
   var detail = "";
   if (data is Uint8List) {
@@ -115,7 +130,7 @@ String httpContentSummary(Object? content) {
 String formatArrayBuffer(Uint8List data) {
   var str = "";
   for (final val in data) {
-    var pad = val < 16 ? "0" : "";
+    final pad = val < 16 ? "0" : "";
     str += "0x$pad${val.toString()} ";
   }
   if (str.isEmpty) return "";

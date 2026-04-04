@@ -16,6 +16,7 @@ class LongPollingTransport implements ITransport {
   final Logger _logger;
   final bool _logMessageContent;
   final AbortController _pollAbort;
+  final int pollTimeoutMs;
 
   bool get pollAborted => _pollAbort.aborted;
 
@@ -35,8 +36,9 @@ class LongPollingTransport implements ITransport {
     SignalRHttpClient httpClient,
     AccessTokenFactory? accessTokenFactory,
     Logger logger,
-    bool logMessageContent,
-  )   : _httpClient = httpClient,
+    bool logMessageContent, {
+    this.pollTimeoutMs = 100000,
+  })  : _httpClient = httpClient,
         _accessTokenFactory = accessTokenFactory,
         _logger = logger,
         _logMessageContent = logMessageContent,
@@ -56,7 +58,7 @@ class LongPollingTransport implements ITransport {
 
     _logger.finest("(LongPolling transport) Connecting");
 
-    if (transferFormat == TransferFormat.Binary) {
+    if (transferFormat == TransferFormat.binary) {
       throw GeneralError(
         "Binary protocols via Long Polling Transport is not supported.",
       );
@@ -65,7 +67,7 @@ class LongPollingTransport implements ITransport {
     final pollOptions = SignalRHttpRequest(
       abortSignal: _pollAbort.signal,
       headers: MessageHeaders(),
-      timeout: 100000,
+      timeout: pollTimeoutMs,
     );
 
     final token = await _getAccessToken();
@@ -186,7 +188,8 @@ class LongPollingTransport implements ITransport {
     try {
       await _receiving;
 
-      _logger.finest("(LongPolling transport) sending DELETE request to $_url.");
+      _logger
+          .finest("(LongPolling transport) sending DELETE request to $_url.");
 
       final deleteOptions = SignalRHttpRequest();
       final token = await _getAccessToken();
@@ -232,8 +235,7 @@ class LongPollingTransport implements ITransport {
     _logger.finest(logMessage);
 
     final err = _closeError;
-    final Exception? ex =
-        err == null ? null : toSignalRException(err);
+    final Exception? ex = err == null ? null : toSignalRException(err);
 
     closeHandler(error: ex);
   }

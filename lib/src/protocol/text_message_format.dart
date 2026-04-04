@@ -17,7 +17,7 @@ class TextMessageFormat {
       throw Exception("Message is incomplete.");
     }
 
-    var messages = input.split(TextMessageFormat.recordSeparator);
+    final messages = input.split(TextMessageFormat.recordSeparator);
 
     messages.removeLast();
     return messages;

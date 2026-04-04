@@ -34,7 +34,10 @@ class HubConnectionBuilder {
     if (isStringEmpty(url)) {
       throw GeneralError('HubConnectionBuilder.withUrl requires a non-empty url.');
     }
-    assert(!(options != null && transportType != null));
+    if (options != null && transportType != null) {
+      throw ArgumentError(
+          'Cannot specify both options and transportType. Use options.transport instead.');
+    }
 
     _url = url;
 
@@ -56,7 +59,10 @@ class HubConnectionBuilder {
     IRetryPolicy? reconnectPolicy,
     List<int>? retryDelays,
   }) {
-    assert(_reconnectPolicy == null);
+    if (_reconnectPolicy != null) {
+      throw StateError(
+          'withAutomaticReconnect can only be called once per builder.');
+    }
 
     if (reconnectPolicy == null && retryDelays == null) {
       _reconnectPolicy = DefaultRetryPolicy();

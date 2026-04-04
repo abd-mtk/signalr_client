@@ -5,31 +5,31 @@ import 'errors.dart';
 /// Specifies a specific HTTP transport type.
 enum HttpTransportType {
   /// Specified no transport preference.
-  None,
+  none,
 
   /// Specifies the WebSockets transport.
-  WebSockets,
+  webSockets,
 
   /// Specifies the Server-Sent Events transport.
-  ServerSentEvents,
+  serverSentEvents,
 
   /// Specifies the Long Polling transport.
-  LongPolling,
+  longPolling,
 }
 
 HttpTransportType httpTransportTypeFromString(String? value) {
   if (value == null || value == "") {
-    return HttpTransportType.None;
+    return HttpTransportType.none;
   }
 
   value = value.toUpperCase();
   switch (value) {
     case "WEBSOCKETS":
-      return HttpTransportType.WebSockets;
+      return HttpTransportType.webSockets;
     case "SERVERSENTEVENTS":
-      return HttpTransportType.ServerSentEvents;
+      return HttpTransportType.serverSentEvents;
     case "LONGPOLLING":
-      return HttpTransportType.LongPolling;
+      return HttpTransportType.longPolling;
     default:
       throw GeneralError("$value is not a supported HttpTransportType");
   }
@@ -38,26 +38,26 @@ HttpTransportType httpTransportTypeFromString(String? value) {
 /// Specifies the transfer format for a connection.
 enum TransferFormat {
   /// TransferFormat is not defined.
-  Undefined,
+  undefined,
 
   /// Specifies that only text data will be transmitted over the connection.
-  Text,
+  text,
 
   /// Specifies that binary data will be transmitted over the connection.
-  Binary,
+  binary,
 }
 
 TransferFormat getTransferFormatFromString(String? value) {
   if (value == null || value == "") {
-    return TransferFormat.Undefined;
+    return TransferFormat.undefined;
   }
 
   value = value.toUpperCase();
   switch (value) {
     case "TEXT":
-      return TransferFormat.Text;
+      return TransferFormat.text;
     case "BINARY":
-      return TransferFormat.Binary;
+      return TransferFormat.binary;
     default:
       throw GeneralError("$value is not a supported TransferFormat");
   }

@@ -27,14 +27,13 @@ class ServerInvokeMethodSimpleParametersNoReturnValue extends Test {
 
   void _handleServerInvokeMethodSimpleParametersNoReturnValue(
       List<Object?>? parameters) {
-    final paramValues = new StringBuffer("Parameters: ");
+    final paramValues = StringBuffer("Parameters: ");
     for (int i = 0; i < parameters!.length; i++) {
       final value = parameters[i];
       paramValues.write("$i => $value, ");
     }
 
     logger.info(
-        "From Callback: Server invoked method 'ServerInvokeMethodSimpleParametersNoReturnValue': " +
-            paramValues.toString());
+        "From Callback: Server invoked method 'ServerInvokeMethodSimpleParametersNoReturnValue': $paramValues");
   }
 }

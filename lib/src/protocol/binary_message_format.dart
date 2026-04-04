@@ -23,25 +23,25 @@ class BinaryMessageFormat {
 
     size = output.length;
 
-    final _buf = Uint8List(lenBuffer.length + size);
-    final _dat = ByteData.view(_buf.buffer, _buf.offsetInBytes);
-    var _offset = 0;
-    final _builder = BytesBuilder(copy: false);
+    final buf = Uint8List(lenBuffer.length + size);
+    final dat = ByteData.view(buf.buffer, buf.offsetInBytes);
+    var offset = 0;
+    final builder = BytesBuilder(copy: false);
 
-    lenBuffer.forEach((element) {
-      _dat.setUint8(_offset, element);
-      _offset++;
-    });
-    output.forEach((element) {
-      _dat.setUint8(_offset, element);
-      _offset++;
-    });
-    _builder.add(Uint8List.view(
-      _buf.buffer,
-      _buf.offsetInBytes,
-      _offset,
+    for (var element in lenBuffer) {
+      dat.setUint8(offset, element);
+      offset++;
+    }
+    for (var element in output) {
+      dat.setUint8(offset, element);
+      offset++;
+    }
+    builder.add(Uint8List.view(
+      buf.buffer,
+      buf.offsetInBytes,
+      offset,
     ));
-    final x = _builder.takeBytes();
+    final x = builder.takeBytes();
     return x;
   }
 
@@ -63,11 +63,11 @@ class BinaryMessageFormat {
           (byteRead & 0x80) != 0);
 
       if ((byteRead & 0x80) != 0 && numBytes < maxLengthPrefixSize) {
-        throw new Exception("Cannot read message size.");
+        throw Exception("Cannot read message size.");
       }
 
       if (numBytes == maxLengthPrefixSize && byteRead > 7) {
-        throw new Exception("Messages bigger than 2GB are not supported.");
+        throw Exception("Messages bigger than 2GB are not supported.");
       }
 
       if (uint8Array.length >= (offset + numBytes + size)) {

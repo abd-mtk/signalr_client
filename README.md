@@ -7,27 +7,30 @@ ASP.NET Core SignalR is an open-source library that simplifies adding real-time 
 
 Tested with ASP.NET Core 3.1 & ASP .NET Core 6
 
-The client is able to invoke server side hub functions (including streaming functions) and to receive method invocations issued by the server.  It also supports the auto-reconnect feature.
+The client is able to invoke server side hub functions (including streaming functions) and to receive method invocations issued by the server. It also supports the auto-reconnect feature.
 
 The client supports the following transport protocols:
-* WebSocket
-* Service Side Events
-* Long Polling
+
+- WebSocket
+- Service Side Events
+- Long Polling
 
 The client supports the following hub protocols:
-* Json
-* MessagePack
+
+- Json
+- MessagePack
 
 ## Examples
 
-* [Chat client/server](https://github.com/sefidgaran/signalr_client/tree/master/example) - A simple client/server chat application.
-* [Integration test app](https://github.com/sefidgaran/signalr_client/tree/master/testapp/client) - To see how a client calls various types of hub functions.
-  
+- [Chat client/server](https://github.com/sefidgaran/signalr_client/tree/master/example) - A simple client/server chat application.
+- [Integration test app](https://github.com/sefidgaran/signalr_client/tree/master/testapp/client) - To see how a client calls various types of hub functions.
 
 ## Getting Started
 
 Add `signalr_netcore` to your `pubspec.yaml` dependencies:
+
 ```yaml
+
 ...
 dependencies:
   flutter:
@@ -44,6 +47,7 @@ Important Note: if you are experiencing issues (for example not receiving messag
 Let's demo some basic usages:
 
 #### 1. Create a hub connection:
+
 ```dart
 // Import the library.
 import 'package:signalr_netcore/signalr_client.dart';
@@ -56,6 +60,7 @@ final hubConnection = HubConnectionBuilder().withUrl(serverUrl).build();
 final hubConnection.onclose( (error) => print("Connection Closed"));
 
 ```
+
 Logging is supported via the dart [logging package](https://pub.dartlang.org/packages/logging):
 
 ```dart
@@ -79,13 +84,13 @@ final transportProtLogger = Logger("SignalR - transport");
 final serverUrl = "192.168.10.50:51001";
 final connectionOptions = HttpConnectionOptions
 final httpOptions = new HttpConnectionOptions(logger: transportProtLogger);
-//final httpOptions = new HttpConnectionOptions(logger: transportProtLogger, transport: HttpTransportType.WebSockets); // default transport type.
-//final httpOptions = new HttpConnectionOptions(logger: transportProtLogger, transport: HttpTransportType.ServerSentEvents);
-//final httpOptions = new HttpConnectionOptions(logger: transportProtLogger, transport: HttpTransportType.LongPolling);
+//final httpOptions = new HttpConnectionOptions(logger: transportProtLogger, transport: HttpTransportType.webSockets); // default transport type.
+//final httpOptions = new HttpConnectionOptions(logger: transportProtLogger, transport: HttpTransportType.serverSentEvents);
+//final httpOptions = new HttpConnectionOptions(logger: transportProtLogger, transport: HttpTransportType.longPolling);
 
-// If you need to authorize the Hub connection than provide a an async callback function that returns 
+// If you need to authorize the Hub connection than provide a an async callback function that returns
 // the token string (see AccessTokenFactory typdef) and assigned it to the accessTokenFactory parameter:
-// final httpOptions = new HttpConnectionOptions( .... accessTokenFactory: () async => await getAccessToken() ); 
+// final httpOptions = new HttpConnectionOptions( .... accessTokenFactory: () async => await getAccessToken() );
 
 // Creates the connection by using the HubConnectionBuilder.
 final hubConnection = HubConnectionBuilder().withUrl(serverUrl, options: httpOptions).configureLogging(hubProtLogger).build();
@@ -93,16 +98,19 @@ final hubConnection = HubConnectionBuilder().withUrl(serverUrl, options: httpOpt
 final hubConnection.onclose( (error) => print("Connection Closed"));
 
 ```
+
 #### 2. Connect to a Hub:
+
 Calling following method starts handshaking and connects the client to SignalR server
+
 ```c
 await hubConnection.start();
 ```
 
-
 #### 3. Calling a Hub function:
 
 Assuming there is this hub function:
+
 ```c
 public string MethodOneSimpleParameterSimpleReturnValue(string p1)
 {
@@ -120,10 +128,10 @@ The client can invoke the function by using:
 
 ```
 
-
 #### 4. Calling a client function:
 
 Assuming the server calls a function "aClientProvidedFunction":
+
 ```c
   await Clients.Caller.SendAsync("aClientProvidedFunction", null);
 ```
@@ -131,7 +139,7 @@ Assuming the server calls a function "aClientProvidedFunction":
 The Client provides the function like this:
 
 ```dart
-  
+
   hubConnection.on("aClientProvidedFunction", _handleAClientProvidedFunction);
 
   // To unregister the function use:
@@ -180,18 +188,18 @@ public void ConfigureServices(IServiceCollection services)
 ### A note about the parameter types
 
 All function parameters and return values are serialized/deserialized into/from JSON by using the dart:convert package (json.endcode/json.decode). Make sure that you:
-* use only simple parameter types
+
+- use only simple parameter types
 
 or
 
-* use objects that implements toJson() since that method is used by the dart:convert package to serialize an object.
+- use objects that implements toJson() since that method is used by the dart:convert package to serialize an object.
 
+Flutter Json 101:
 
-Flutter Json 101: 
-* [flutter.io](https://flutter.io/json/)
-* [json.encode](https://api.dartlang.org/stable/2.0.0/dart-convert/JsonCodec/encode.html)
-* [json.decode](https://api.dartlang.org/stable/2.0.0/dart-convert/JsonCodec/decode.html)
-
+- [flutter.io](https://flutter.io/json/)
+- [json.encode](https://api.dartlang.org/stable/2.0.0/dart-convert/JsonCodec/encode.html)
+- [json.decode](https://api.dartlang.org/stable/2.0.0/dart-convert/JsonCodec/decode.html)
 
 #### MSGPACK
 
@@ -232,8 +240,8 @@ final _hubConnection = HubConnectionBuilder()
 Http Request Log:
 
 ```
-I/flutter ( 5248): Starting connection with transfer format 'TransferFormat.Text'.
+I/flutter ( 5248): Starting connection with transfer format 'TransferFormat.text'.
 I/flutter ( 5248): Sending negotiation request: https://localhost:5000/negotiate?negotiateVersion=1
-I/flutter ( 5248): HTTP send: url 'https://localhost:5000/negotiate?negotiateVersion=1', method: 'POST' content: '' content length = '0' 
+I/flutter ( 5248): HTTP send: url 'https://localhost:5000/negotiate?negotiateVersion=1', method: 'POST' content: '' content length = '0'
 headers: '{ content-type: text/plain;charset=UTF-8 }, { HEADER_MOCK_1: HEADER_VALUE_1 }, { X-Requested-With: FlutterHttpClient }, { HEADER_MOCK_2: HEADER_VALUE_2 }, { Authorization: Bearer JWT_TOKEN }'
 ```

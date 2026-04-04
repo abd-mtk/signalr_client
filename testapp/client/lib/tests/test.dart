@@ -38,7 +38,7 @@ abstract class Test extends ViewModel {
         assert(logger != null),
         assert(description != null),
         _hubConnectionProvider = hubConnectionProvider!,
-        this.logger = logger!,
+        logger = logger!,
         description = description!;
 
   Future<void> run() async {

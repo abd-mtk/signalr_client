@@ -33,11 +33,11 @@ class HubConnectionStateMaintainer {
 
 /// Lifecycle state of [HubConnection].
 enum HubConnectionState {
-  Disconnected,
-  Connecting,
-  Connected,
-  Disconnecting,
-  Reconnecting,
+  disconnected,
+  connecting,
+  connected,
+  disconnecting,
+  reconnecting,
 }
 
 typedef InvocationEventCallback = void Function(
