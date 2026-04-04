@@ -232,9 +232,8 @@ class LongPollingTransport implements ITransport {
     _logger.finest(logMessage);
 
     final err = _closeError;
-    final Exception? ex = err == null
-        ? null
-        : (err is Exception ? err : toSignalRException(err));
+    final Exception? ex =
+        err == null ? null : toSignalRException(err);
 
     closeHandler(error: ex);
   }

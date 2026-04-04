@@ -5,6 +5,7 @@ import 'package:logging/logging.dart';
 
 import '../core/errors.dart';
 import '../core/iconnection.dart';
+import '../core/signalr_exception.dart';
 import '../core/itransport.dart';
 import '../infrastructure/long_polling_transport.dart';
 import '../infrastructure/server_sent_events_transport.dart';
@@ -116,7 +117,10 @@ class HttpConnection implements IConnection {
   }
 
   @override
-  Future<void>? stop({Exception? error}) async {
+  Future<void>? stop({Object? error}) async {
+    final Exception? ex =
+        error == null ? null : toSignalRException(error);
+
     if (_connectionState == ConnectionState.Disconnected) {
       _logger.finer(
         "Call to HttpConnection.stop($error) ignored because the connection is already in the disconnected state.",
@@ -136,7 +140,7 @@ class HttpConnection implements IConnection {
     _stopPromiseCompleter = Completer<void>();
     _stopPromise = _stopPromiseCompleter.future;
 
-    await _stopInternal(error: error);
+    await _stopInternal(error: ex);
     await _stopPromise;
   }
 

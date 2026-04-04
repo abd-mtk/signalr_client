@@ -227,7 +227,7 @@ class HubConnection {
       // HttpConnection.stop() should not complete until after the onclose callback is invoked.
       // This will transition the HubConnection to the disconnected state before HttpConnection.stop() completes.
       await _connection.stop(
-        error: e is Exception ? e : toSignalRException(e),
+        error: toSignalRException(e),
       );
       throw e;
     }
@@ -817,7 +817,7 @@ class HubConnection {
           return;
         }
 
-        retryError = e is Exception ? e : GeneralError(e.toString());
+        retryError = toSignalRException(e);
         nextRetryDelay = _getNextRetryDelay(
             previousReconnectAttempts++,
             DateTime.now().difference(reconnectStartTime).inMilliseconds,
@@ -917,12 +917,7 @@ class HubConnection {
         promiseQueue = promiseQueue
             ?.then((_) => _sendWithProtocol(_createCompletionMessage(id)));
       }, onError: (err) {
-        String message;
-        if (err is Exception) {
-          message = err.toString();
-        } else {
-          message = "Unknown error";
-        }
+        final message = toSignalRException(err).toString();
 
         promiseQueue = promiseQueue?.then((_) =>
             _sendWithProtocol(_createCompletionMessage(id, error: message)));

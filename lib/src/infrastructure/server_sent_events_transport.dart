@@ -39,10 +39,8 @@ class ServerSentEventsTransport implements ITransport {
     if (_onCloseRaised) return;
     _onCloseRaised = true;
 
-    Exception? ex;
-    if (error != null) {
-      ex = error is Exception ? error : toSignalRException(error, st);
-    }
+    final Exception? ex =
+        error == null ? null : toSignalRException(error, st);
     onClose?.call(error: ex);
   }
 

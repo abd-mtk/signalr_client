@@ -16,7 +16,7 @@ abstract class IConnection {
 
   Future<void> start({TransferFormat? transferFormat});
   Future<void> send(Object? data);
-  Future<void>? stop({Exception? error});
+  Future<void>? stop({Object? error});
 
   OnReceive? onreceive;
   OnClose? onclose;
