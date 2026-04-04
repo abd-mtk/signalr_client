@@ -13,18 +13,13 @@ class SignalRHttpRequest {
   int? timeout;
 
   SignalRHttpRequest({
-    String? method,
-    String? url,
-    Object? content,
-    MessageHeaders? headers,
-    IAbortSignal? abortSignal,
-    int? timeout,
-  })  : method = method,
-        url = url,
-        content = content,
-        headers = headers,
-        abortSignal = abortSignal,
-        timeout = timeout;
+    this.method,
+    this.url,
+    this.content,
+    this.headers,
+    this.abortSignal,
+    this.timeout,
+  });
 }
 
 /// Represents an HTTP response.
@@ -34,12 +29,10 @@ class SignalRHttpResponse {
   final Object? content;
 
   SignalRHttpResponse(
-    int statusCode, {
-    String? statusText = '',
-    Object? content,
-  })  : statusCode = statusCode,
-        statusText = statusText,
-        content = content;
+    this.statusCode, {
+    this.statusText = '',
+    this.content,
+  });
 }
 
 /// Abstraction over an HTTP client.

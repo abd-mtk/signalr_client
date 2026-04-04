@@ -59,7 +59,8 @@ class WebSocketTransport implements ITransport {
       if (!isStringEmpty(token)) {
         if (kIsWeb) {
           final encodedToken = Uri.encodeComponent(token);
-          connectUrl = "$connectUrl${connectUrl.contains('?') ? '&' : '?'}access_token=$encodedToken";
+          connectUrl =
+              "$connectUrl${connectUrl.contains('?') ? '&' : '?'}access_token=$encodedToken";
         } else {
           headers = Map<String, String>.from(headers);
           headers['Authorization'] = 'Bearer $token';
@@ -78,6 +79,7 @@ class WebSocketTransport implements ITransport {
       if (kIsWeb) {
         channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       } else {
+        // ignore: close_sinks — closed via IOWebSocketChannel in _closeInternal()
         final webSocket = await io.WebSocket.connect(wsUrl, headers: headers);
         channel = IOWebSocketChannel(webSocket);
       }
