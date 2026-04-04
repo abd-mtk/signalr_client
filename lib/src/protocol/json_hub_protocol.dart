@@ -53,6 +53,9 @@ class JsonHubProtocol implements IHubProtocol {
         case MessageType.Invocation:
           messageObj = _getInvocationMessageFromJson(jsonData);
           break;
+        case MessageType.StreamInvocation:
+          messageObj = _getStreamInvocationMessageFromJson(jsonData);
+          break;
         case MessageType.StreamItem:
           messageObj = _getStreamItemMessageFromJson(jsonData);
           break;
@@ -114,6 +117,30 @@ class JsonHubProtocol implements IHubProtocol {
     if (message.invocationId != null) {
       _assertNotEmptyString(
           message.invocationId, "Invalid payload for Invocation message.");
+    }
+
+    return message;
+  }
+
+  static StreamInvocationMessage _getStreamInvocationMessageFromJson(
+      Map<String, dynamic> jsonData) {
+    final MessageHeaders? headers =
+        createMessageHeadersFromJson(jsonData["headers"]);
+    final message = StreamInvocationMessage(
+        target: jsonData["target"],
+        arguments: jsonData["arguments"]?.cast<Object?>().toList(),
+        streamIds: (jsonData["streamIds"] == null)
+            ? null
+            : (List<String>.from(jsonData["streamIds"] as List<dynamic>)),
+        headers: headers,
+        invocationId: jsonData["invocationId"] as String?);
+
+    _assertNotEmptyString(
+        message.target, "Invalid payload for StreamInvocation message.");
+    if (message.invocationId != null) {
+      _assertNotEmptyString(
+          message.invocationId,
+          "Invalid payload for StreamInvocation message.");
     }
 
     return message;

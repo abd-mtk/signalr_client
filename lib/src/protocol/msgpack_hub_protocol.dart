@@ -78,6 +78,11 @@ class MessagePackHubProtocol implements IHubProtocol {
       return messageObj;
     }
 
+    if (messageType == MessageType.StreamInvocation.index) {
+      messageObj = _createStreamInvocationMessage(data);
+      return messageObj;
+    }
+
     if (messageType == MessageType.StreamItem.index) {
       messageObj = _createStreamItemMessage(data);
       return messageObj;
@@ -134,9 +139,28 @@ class MessagePackHubProtocol implements IHubProtocol {
         headers: headers,
         invocationId: data[2] as String?,
         streamIds: [],
-        arguments: List<Object>.from(data[4]));
+        arguments: List<Object?>.from(data[4] as List));
 
     return message;
+  }
+
+  static StreamInvocationMessage _createStreamInvocationMessage(
+      List<dynamic> data) {
+    if (data.length < 5) {
+      throw GeneralError("Invalid payload for StreamInvocation message.");
+    }
+
+    final MessageHeaders? headers = createMessageHeaders(data);
+
+    return StreamInvocationMessage(
+      target: data[3] as String?,
+      headers: headers,
+      invocationId: data[2] as String?,
+      arguments: List<Object?>.from(data[4] as List),
+      streamIds: data.length > 5
+          ? List<String>.from(data[5] as List)
+          : null,
+    );
   }
 
   static StreamItemMessage _createStreamItemMessage(List<dynamic> data) {

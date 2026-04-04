@@ -300,7 +300,7 @@ class HubConnection {
   /// args: The arguments used to invoke the server method.
   /// Returns an object that yields results from the server as they are received.
   ///
-  Stream<Object?> stream(String methodName, List<Object> args) {
+  Stream<Object?> stream(String methodName, List<Object?> args) {
     return streamControllable(methodName, args).stream;
   }
 
@@ -312,7 +312,7 @@ class HubConnection {
   /// Returns a StreamControler object that yields results from the server as they are received.
   ///
   StreamController<Object?> streamControllable(
-      String methodName, List<Object> args) {
+      String methodName, List<Object?> args) {
     final t = _replaceStreamingParams(args);
     final invocationDescriptor =
         _createStreamInvocation(methodName, args, t.keys.toList());
@@ -378,8 +378,8 @@ class HubConnection {
   /// args: The arguments used to invoke the server method.
   /// Returns a Promise that resolves when the invocation has been successfully sent, or rejects with an error.
   ///
-  Future<void> send(String methodName, {List<Object>? args}) {
-    args = args ?? [];
+  Future<void> send(String methodName, {List<Object?>? args}) {
+    args = args ?? <Object?>[];
     final t = _replaceStreamingParams(args);
     final sendPromise = _sendWithProtocol(
         _createInvocation(methodName, args, true, t.keys.toList()));
@@ -398,8 +398,8 @@ class HubConnection {
   /// args: The arguments used to invoke the server method.
   /// Returns a Future that resolves with the result of the server method (if any), or rejects with an error.
   ///
-  Future<Object?> invoke(String methodName, {List<Object>? args}) {
-    args = args ?? [];
+  Future<Object?> invoke(String methodName, {List<Object?>? args}) {
+    args = args ?? <Object?>[];
     final t = _replaceStreamingParams(args);
     final invocationDescriptor =
         _createInvocation(methodName, args, false, t.keys.toList());
@@ -875,7 +875,7 @@ class HubConnection {
     }
   }
 
-  InvocationMessage _createInvocation(String methodName, List<Object> args,
+  InvocationMessage _createInvocation(String methodName, List<Object?> args,
       bool nonblocking, List<String> streamIds) {
     if (nonblocking) {
       return InvocationMessage(
@@ -930,7 +930,7 @@ class HubConnection {
     });
   }
 
-  Map<String, Stream<Object>> _replaceStreamingParams(List<Object> args) {
+  Map<String, Stream<Object>> _replaceStreamingParams(List<Object?> args) {
     final streams = <String, Stream<Object>>{};
 
     for (var i = 0; i < args.length; i++) {
@@ -952,7 +952,7 @@ class HubConnection {
   /// isObservable
 
   StreamInvocationMessage _createStreamInvocation(
-      String methodName, List<Object> args, List<String> streamIds) {
+      String methodName, List<Object?> args, List<String> streamIds) {
     final invocationId = _invocationId;
     _invocationId = _invocationId + 1;
 

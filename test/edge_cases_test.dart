@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logging/logging.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
 void main() {
@@ -71,6 +74,45 @@ void main() {
     });
   });
 
+  group('normalizeWebSocketConnectUrl', () {
+    test('https hub path becomes wss without :0 or fragment', () {
+      expect(
+        normalizeWebSocketConnectUrl(
+          'https://www.example.com/Channels/Support',
+        ),
+        'wss://www.example.com/Channels/Support',
+      );
+    });
+
+    test('strips fragment (not used in WebSocket handshake)', () {
+      expect(
+        normalizeWebSocketConnectUrl('https://host.example/hub#section'),
+        'wss://host.example/hub',
+      );
+    });
+
+    test('preserves explicit non-default port', () {
+      expect(
+        normalizeWebSocketConnectUrl('https://host.example:8443/hub'),
+        'wss://host.example:8443/hub',
+      );
+    });
+
+    test('ws input is normalized to ws and drops fragment', () {
+      expect(
+        normalizeWebSocketConnectUrl('ws://host.example/path#x'),
+        'ws://host.example/path',
+      );
+    });
+
+    test('rejects invalid port', () {
+      expect(
+        () => normalizeWebSocketConnectUrl('https://host:0/p'),
+        throwsArgumentError,
+      );
+    });
+  });
+
   group('urlWithCacheBuster', () {
     test('uses ? when url has no query string', () {
       const base = 'https://example.com/hub';
@@ -105,6 +147,90 @@ void main() {
       expect(h, isNotNull);
       expect(h!.getHeaderValue('a'), '1');
       expect(h.getHeaderValue('b'), 'true');
+    });
+  });
+
+  group('Nullable hub arguments — JSON', () {
+    final log = Logger('edge_cases');
+    final protocol = JsonHubProtocol();
+
+    test('InvocationMessage write/parse preserves null in arguments', () {
+      final msg = InvocationMessage(
+        target: 'SomeMethod',
+        arguments: ['value', null, 123],
+        invocationId: '1',
+      );
+      final wire = protocol.writeMessage(msg);
+      final parsed = protocol.parseMessages(wire, log);
+      expect(parsed, hasLength(1));
+      final back = parsed.single as InvocationMessage;
+      expect(back.arguments, ['value', null, 123]);
+    });
+
+    test('StreamInvocationMessage write/parse preserves null in arguments', () {
+      final msg = StreamInvocationMessage(
+        target: 'StreamMethod',
+        arguments: [null, 'x', 2],
+        invocationId: '2',
+        streamIds: const [],
+      );
+      final wire = protocol.writeMessage(msg);
+      final parsed = protocol.parseMessages(wire, log);
+      expect(parsed, hasLength(1));
+      final back = parsed.single as StreamInvocationMessage;
+      expect(back.arguments, [null, 'x', 2]);
+    });
+  });
+
+  group('Nullable hub arguments — MessagePack', () {
+    final log = Logger('edge_cases_mp');
+    final protocol = MessagePackHubProtocol();
+
+    test('InvocationMessage write/parse preserves null in arguments', () {
+      final msg = InvocationMessage(
+        target: 'M',
+        arguments: ['a', null, 7],
+        invocationId: '9',
+      );
+      final written = protocol.writeMessage(msg);
+      expect(written, isA<Uint8List>());
+      final parsed =
+          protocol.parseMessages(written as Uint8List, log);
+      expect(parsed, hasLength(1));
+      final back = parsed.single as InvocationMessage;
+      expect(back.arguments, ['a', null, 7]);
+    });
+
+    test('StreamInvocationMessage write/parse preserves null in arguments', () {
+      final msg = StreamInvocationMessage(
+        target: 'S',
+        arguments: [null, 'ok'],
+        invocationId: '10',
+        streamIds: null,
+      );
+      final written = protocol.writeMessage(msg);
+      expect(written, isA<Uint8List>());
+      final parsed =
+          protocol.parseMessages(written as Uint8List, log);
+      expect(parsed, hasLength(1));
+      final back = parsed.single as StreamInvocationMessage;
+      expect(back.arguments, [null, 'ok']);
+    });
+
+    test('StreamInvocationMessage with streamIds roundtrips', () {
+      final msg = StreamInvocationMessage(
+        target: 'T',
+        arguments: [1, null],
+        invocationId: '11',
+        streamIds: ['s1'],
+      );
+      final written = protocol.writeMessage(msg);
+      final parsed =
+          protocol.parseMessages(written as Uint8List, log);
+      expect(parsed, hasLength(1));
+      final back = parsed.single as StreamInvocationMessage;
+      expect(back.arguments, [1, null]);
+      expect(back.streamIds, ['s1']);
     });
   });
 }

@@ -71,7 +71,7 @@ class WebSocketTransport implements ITransport {
 
     final websocketCompleter = Completer<void>();
     var opened = false;
-    final wsUrl = connectUrl.replaceFirst('http', 'ws');
+    final wsUrl = normalizeWebSocketConnectUrl(connectUrl);
     _logger.finest("WebSocket try connecting to '$wsUrl'.");
 
     try {
