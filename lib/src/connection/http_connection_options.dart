@@ -1,0 +1,64 @@
+import 'package:equatable/equatable.dart';
+import 'package:logging/logging.dart';
+
+import '../core/itransport.dart';
+import '../di/signalr_locator.dart';
+import '../protocol/ihub_protocol.dart';
+import '../protocol/signalr_http_client.dart';
+
+/// Immutable options for HTTP-based transports.
+class HttpConnectionOptions extends Equatable {
+  final SignalRHttpClient? httpClient;
+  final Object? transport;
+  final Logger logger;
+  final AccessTokenFactory? accessTokenFactory;
+  final MessageHeaders? headers;
+  final bool logMessageContent;
+  final bool skipNegotiation;
+  final int requestTimeout;
+
+  HttpConnectionOptions({
+    this.httpClient,
+    this.transport,
+    Logger? logger,
+    this.accessTokenFactory,
+    this.headers,
+    this.logMessageContent = false,
+    this.skipNegotiation = false,
+    this.requestTimeout = 2000,
+  }) : logger = resolveSignalRLogger(logger);
+
+  HttpConnectionOptions copyWith({
+    SignalRHttpClient? httpClient,
+    Object? transport,
+    Logger? logger,
+    AccessTokenFactory? accessTokenFactory,
+    MessageHeaders? headers,
+    bool? logMessageContent,
+    bool? skipNegotiation,
+    int? requestTimeout,
+  }) {
+    return HttpConnectionOptions(
+      httpClient: httpClient ?? this.httpClient,
+      transport: transport ?? this.transport,
+      logger: logger ?? this.logger,
+      accessTokenFactory: accessTokenFactory ?? this.accessTokenFactory,
+      headers: headers ?? this.headers,
+      logMessageContent: logMessageContent ?? this.logMessageContent,
+      skipNegotiation: skipNegotiation ?? this.skipNegotiation,
+      requestTimeout: requestTimeout ?? this.requestTimeout,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        httpClient,
+        transport,
+        logger,
+        accessTokenFactory,
+        headers,
+        logMessageContent,
+        skipNegotiation,
+        requestTimeout,
+      ];
+}

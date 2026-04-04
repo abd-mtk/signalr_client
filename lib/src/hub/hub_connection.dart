@@ -2,87 +2,42 @@ import 'dart:async';
 
 import 'package:logging/logging.dart';
 
-import 'default_reconnect_policy.dart';
-import 'errors.dart';
-import 'handshake_protocol.dart';
-import 'iconnection.dart';
-import 'ihub_protocol.dart';
-import 'iretry_policy.dart';
-import 'utils.dart';
+import '../core/errors.dart';
+import '../core/iconnection.dart';
+import '../core/iretry_policy.dart';
+import '../core/signalr_exception.dart';
+import '../protocol/handshake_protocol.dart';
+import '../protocol/ihub_protocol.dart';
+import '../shared/utils.dart';
+import 'hub_connection_state.dart';
 
-const int DEFAULT_TIMEOUT_IN_MS = 30 * 1000;
-const int DEFAULT_PING_INTERVAL_IN_MS = 15 * 1000;
-
-/// internal class to wrap emitting events once the {@link HubConnectionState} changes.
-class _HubConnectionStateMaintainer {
-  late StreamController<HubConnectionState> _hubConnectionStateStreamController;
-  late HubConnectionState _connectionState;
-
-  _HubConnectionStateMaintainer(HubConnectionState initialConnectionState) {
-    _hubConnectionStateStreamController =
-        StreamController<HubConnectionState>.broadcast();
-    _connectionState = initialConnectionState;
-  }
-
-  set hubConnectionState(HubConnectionState hubConnectionState) {
-    _connectionState = hubConnectionState;
-    _hubConnectionStateStreamController.add(_connectionState);
-  }
-
-  HubConnectionState get hubConnectionState => _connectionState;
-
-  Stream<HubConnectionState> get hubConnectionStateStream =>
-      _hubConnectionStateStreamController.stream;
-}
-
-/// Describes the current state of the {@link HubConnection} to the server.
-enum HubConnectionState {
-  /// The hub connection is disconnected.
-  Disconnected,
-
-  /// The hub connection is connecting.
-  Connecting,
-
-  /// The hub connection is connected.
-  Connected,
-
-  /// The hub connection is disconnecting.
-  Disconnecting,
-
-  /// The hub connection is reconnecting.
-  Reconnecting,
-}
-
-typedef InvocationEventCallback = void Function(
-    HubMessageBase? invocationEvent, Exception? error);
-typedef MethodInvocationFunc = void Function(List<Object?>? arguments);
-typedef ClosedCallback = void Function({Exception? error});
-typedef ReconnectingCallback = void Function({Exception? error});
-typedef ReconnectedCallback = void Function({String? connectionId});
-
-/// Represents a connection to a SignalR Hub
+/// Connection to an ASP.NET Core SignalR hub.
+///
+/// Failures from [start], [invoke], [stream], and [stop] are surfaced as [Exception].
+/// On web, underlying JS errors are wrapped in [SignalRError]; use [SignalRError.original]
+/// for the raw value when debugging.
 class HubConnection {
   // Either a string (json) or Uint8List (binary);
   Object? _cachedPingMessage;
   final IConnection _connection;
-  final Logger? _logger;
+  final Logger _logger;
   final IRetryPolicy _reconnectPolicy;
   final IHubProtocol _protocol;
   final HandshakeProtocol _handshakeProtocol;
 
   late Map<String?, InvocationEventCallback> _callbacks;
   late Map<String, List<MethodInvocationFunc>> _methods;
-  int? _invocationId;
+  int _invocationId = 0;
 
   late List<ClosedCallback> _closedCallbacks;
   late List<ReconnectingCallback> _reconnectingCallbacks;
   late List<ReconnectedCallback> _reconnectedCallbacks;
 
   late bool _receivedHandshakeResponse;
-  Completer? _handshakeCompleter;
+  Completer<void>? _handshakeCompleter;
   Exception? _stopDuringStartError;
 
-  late final _HubConnectionStateMaintainer _hubConnectionStateMaintainer;
+  late final HubConnectionStateMaintainer _hubConnectionStateMaintainer;
   HubConnectionState get _connectionState =>
       _hubConnectionStateMaintainer.hubConnectionState;
   set _connectionState(HubConnectionState hubConnectionState) {
@@ -148,13 +103,23 @@ class HubConnection {
   }
 
   static HubConnection create(
-      IConnection connection, Logger? logger, IHubProtocol protocol,
-      {IRetryPolicy? reconnectPolicy}) {
-    return HubConnection(connection, logger, protocol,
-        reconnectPolicy: reconnectPolicy);
+    IConnection connection,
+    Logger logger,
+    IHubProtocol protocol, {
+    IRetryPolicy? reconnectPolicy,
+  }) {
+    return HubConnection(
+      connection,
+      logger,
+      protocol,
+      reconnectPolicy: reconnectPolicy,
+    );
   }
 
-  HubConnection(IConnection connection, Logger? logger, IHubProtocol protocol,
+  HubConnection(
+    IConnection connection,
+    Logger logger,
+    IHubProtocol protocol,
       {IRetryPolicy? reconnectPolicy})
       : _connection = connection,
         _logger = logger,
@@ -172,10 +137,9 @@ class HubConnection {
     _closedCallbacks = [];
     _reconnectingCallbacks = [];
     _reconnectedCallbacks = [];
-    _invocationId = 0;
     _receivedHandshakeResponse = false;
     _hubConnectionStateMaintainer =
-        _HubConnectionStateMaintainer(HubConnectionState.Disconnected);
+        HubConnectionStateMaintainer(HubConnectionState.Disconnected);
     _connectionStarted = false;
 
     _cachedPingMessage = _protocol.writeMessage(PingMessage());
@@ -185,9 +149,10 @@ class HubConnection {
   ///
   /// Returns a Promise that resolves when the connection has been successfully established, or rejects with an error.
   ///
-  Future<void>? start() async {
-    _startPromise = _startWithStateTransitions();
-    return _startPromise;
+  Future<void> start() async {
+    final started = _startWithStateTransitions();
+    _startPromise = started;
+    return started;
   }
 
   Future<void> _startWithStateTransitions() async {
@@ -197,17 +162,17 @@ class HubConnection {
     }
 
     _connectionState = HubConnectionState.Connecting;
-    _logger?.finer("Starting HubConnection.");
+    _logger.finer("Starting HubConnection.");
 
     try {
       await _startInternal();
 
       _connectionState = HubConnectionState.Connected;
       _connectionStarted = true;
-      _logger?.finer("HubConnection connected successfully.");
+      _logger.finer("HubConnection connected successfully.");
     } catch (e) {
       _connectionState = HubConnectionState.Disconnected;
-      _logger?.finer(
+      _logger.finer(
           "HubConnection failed to start successfully because of error '$e'.");
       return Future.error(e);
     }
@@ -217,38 +182,43 @@ class HubConnection {
     _stopDuringStartError = null;
     _receivedHandshakeResponse = false;
     // Set up the promise before any connection is (re)started otherwise it could race with received messages
-    _handshakeCompleter = Completer();
+    _handshakeCompleter = Completer<void>();
     await _connection.start(transferFormat: _protocol.transferFormat);
 
     try {
       final handshakeRequest =
           HandshakeRequestMessage(_protocol.name, _protocol.version);
 
-      _logger?.finer("Sending handshake request.");
+      _logger.finer("Sending handshake request.");
 
       await _sendMessage(
           _handshakeProtocol.writeHandshakeRequest(handshakeRequest));
 
-      _logger?.info("Using HubProtocol '${_protocol.name}'.");
+      _logger.info("Using HubProtocol '${_protocol.name}'.");
 
       // defensively cleanup timeout in case we receive a message from the server before we finish start
       _cleanupTimeout();
       _resetTimeoutPeriod();
       _resetKeepAliveInterval();
 
-      await _handshakeCompleter!.future;
+      final handshakeDone = _handshakeCompleter;
+      if (handshakeDone == null) {
+        throw StateError('Hub handshake completer missing');
+      }
+      await handshakeDone.future;
 
       // It's important to check the stopDuringStartError instead of just relying on the handshakePromise
       // being rejected on close, because this continuation can run after both the handshake completed successfully
       // and the connection was closed.
-      if (_stopDuringStartError != null) {
+      final duringStart = _stopDuringStartError;
+      if (duringStart != null) {
         // It's important to throw instead of returning a rejected promise, because we don't want to allow any state
         // transitions to occur between now and the calling code observing the exceptions. Returning a rejected promise
         // will cause the calling continuation to get scheduled to run later.
-        throw _stopDuringStartError!;
+        throw duringStart;
       }
     } catch (e) {
-      _logger?.finer(
+      _logger.finer(
           "Hub handshake failed with error '$e' during start(). Stopping HubConnection.");
 
       _cleanupTimeout();
@@ -256,7 +226,9 @@ class HubConnection {
 
       // HttpConnection.stop() should not complete until after the onclose callback is invoked.
       // This will transition the HubConnection to the disconnected state before HttpConnection.stop() completes.
-      await _connection.stop(error: e is Exception ? e : GeneralError(e.toString()));
+      await _connection.stop(
+        error: e is Exception ? e : toSignalRException(e),
+      );
       throw e;
     }
   }
@@ -282,26 +254,26 @@ class HubConnection {
 
   Future<void>? _stopInternal({Exception? error}) async {
     if (_connectionState == HubConnectionState.Disconnected) {
-      _logger?.finer(
+      _logger.finer(
           "Call to HubConnection.stop($error) ignored because it is already in the disconnected state.");
       return Future.value();
     }
 
     if (_connectionState == HubConnectionState.Disconnecting) {
-      _logger?.finer(
-          "Call to HttpConnection.stop($error) ignored because the connection is already in the disconnecting state.");
+      _logger.finer(
+          "Call to HubConnection.stop($error) ignored because the connection is already in the disconnecting state.");
       return _stopPromise;
     }
 
     _connectionState = HubConnectionState.Disconnecting;
 
-    _logger?.finer("Stopping HubConnection.");
+    _logger.finer("Stopping HubConnection.");
 
     if (_reconnectDelayTimer != null) {
       // We're in a reconnect delay which means the underlying connection is currently already stopped.
       // Just clear the handle to stop the reconnect loop (which no one is waiting on thankfully) and
       // fire the onclose callbacks.
-      _logger?.finer(
+      _logger.finer(
           "Connection stopped during reconnect delay. Done reconnecting.");
 
       _cleanupReconnectTimer();
@@ -443,7 +415,7 @@ class HubConnection {
         if (invocationEvent is CompletionMessage) {
           if (invocationEvent.error != null) {
             if (!completer.isCompleted) {
-              completer.completeError(new GeneralError(invocationEvent.error));
+              completer.completeError(GeneralError(invocationEvent.error));
             }
           } else {
             if (!completer.isCompleted) {
@@ -452,7 +424,7 @@ class HubConnection {
           }
         } else {
           if (!completer.isCompleted) {
-            completer.completeError(new GeneralError(
+            completer.completeError(GeneralError(
                 "Unexpected message type: ${invocationEvent.type}"));
           }
         }
@@ -482,16 +454,15 @@ class HubConnection {
     }
 
     methodName = methodName.toLowerCase();
-    if (_methods[methodName] == null) {
-      _methods[methodName] = [];
-    }
+    final handlers =
+        _methods.putIfAbsent(methodName, () => <MethodInvocationFunc>[]);
 
     // Preventing adding the same handler multiple times.
-    if (_methods[methodName]!.indexOf(newMethod) != -1) {
+    if (handlers.indexOf(newMethod) != -1) {
       return;
     }
 
-    _methods[methodName]!.add(newMethod);
+    handlers.add(newMethod);
   }
 
   /// Removes the specified handler for the specified hub method.
@@ -509,7 +480,7 @@ class HubConnection {
     }
 
     methodName = methodName.toLowerCase();
-    final List<void Function(List<Object>)>? handlers = _methods[methodName];
+    final List<MethodInvocationFunc>? handlers = _methods[methodName];
     if (handlers == null) {
       return;
     }
@@ -539,7 +510,7 @@ class HubConnection {
   ///
   /// callback: The handler that will be invoked when the connection starts reconnecting. Optionally receives a single argument containing the error that caused the connection to start reconnecting (if any).
   ///
-  onreconnecting(ReconnectingCallback callback) {
+  void onreconnecting(ReconnectingCallback callback) {
     _reconnectingCallbacks.add(callback);
   }
 
@@ -547,7 +518,7 @@ class HubConnection {
   ///
   /// callback: The handler that will be invoked when the connection successfully reconnects.
   ///
-  onreconnected(ReconnectedCallback callback) {
+  void onreconnected(ReconnectedCallback callback) {
     _reconnectedCallbacks.add(callback);
   }
 
@@ -565,7 +536,7 @@ class HubConnection {
       final messages = _protocol.parseMessages(data, _logger);
 
       for (final message in messages) {
-        _logger?.finest("Handle message of type '${message.type}'.");
+        _logger.finest("Handle message of type '${message.type}'.");
         switch (message.type) {
           case MessageType.Invocation:
             _invokeClientMethod(message as InvocationMessage);
@@ -586,12 +557,12 @@ class HubConnection {
             // Don't care about pings
             break;
           case MessageType.Close:
-            _logger?.info("Close message received from server.");
+            _logger.info("Close message received from server.");
             final closeMessage = message as CloseMessage;
 
-            final Exception? error = closeMessage.error != null
-                ? GeneralError(
-                    "Server returned an error on close: " + closeMessage.error!)
+            final closeErr = closeMessage.error;
+            final Exception? error = closeErr != null
+                ? GeneralError("Server returned an error on close: $closeErr")
                 : null;
 
             if (closeMessage.allowReconnect == true) {
@@ -606,7 +577,7 @@ class HubConnection {
 
             break;
           default:
-            _logger?.warning("Invalid message type: '${message.type}'");
+            _logger.warning("Invalid message type: '${message.type}'");
             break;
         }
       }
@@ -623,35 +594,37 @@ class HubConnection {
       handshakeResult = _handshakeProtocol.parseHandshakeResponse(data);
     } catch (e) {
       final message = "Error parsing handshake response: '${e.toString()}'.";
-      _logger?.severe(message);
-
-      final error = GeneralError(message);
-
-      if (!_handshakeCompleter!.isCompleted) {
-        _handshakeCompleter?.completeError(error);
-      }
-      _handshakeCompleter = null;
-      throw error;
+      _logger.severe(message);
+      return _failHandshake(GeneralError(message));
     }
     if (!isStringEmpty(handshakeResult.handshakeResponseMessage.error)) {
       final message =
           "Server returned handshake error: '${handshakeResult.handshakeResponseMessage.error}'";
-      _logger?.severe(message);
-
-      final error = GeneralError(message);
-
-      if (!_handshakeCompleter!.isCompleted) {
-        _handshakeCompleter?.completeError(error);
-      }
-      _handshakeCompleter = null;
-      throw error;
+      _logger.severe(message);
+      return _failHandshake(GeneralError(message));
     } else {
-      _logger?.finer("Server handshake complete.");
+      _logger.finer("Server handshake complete.");
     }
 
-    if (!_handshakeCompleter!.isCompleted) _handshakeCompleter?.complete();
-    _handshakeCompleter = null;
+    _completeHandshakeIfPending();
     return handshakeResult.remainingData;
+  }
+
+  Never _failHandshake(Exception error) {
+    final hs = _handshakeCompleter;
+    if (hs != null && !hs.isCompleted) {
+      hs.completeError(error);
+    }
+    _handshakeCompleter = null;
+    throw error;
+  }
+
+  void _completeHandshakeIfPending() {
+    final hs = _handshakeCompleter;
+    if (hs != null && !hs.isCompleted) {
+      hs.complete();
+    }
+    _handshakeCompleter = null;
   }
 
   void _resetKeepAliveInterval() {
@@ -673,9 +646,8 @@ class HubConnection {
 
   void _resetTimeoutPeriod() {
     _cleanupTimeout();
-    if ((_connection.features == null) ||
-        (_connection.features!.inherentKeepAlive == null) ||
-        (!_connection.features!.inherentKeepAlive!)) {
+    final inherent = _connection.features?.inherentKeepAlive;
+    if (inherent != true) {
       // Set the timeout timer
       _timeoutTimer = Timer.periodic(
           Duration(milliseconds: serverTimeoutInMilliseconds), _serverTimeout);
@@ -683,35 +655,44 @@ class HubConnection {
   }
 
   void _serverTimeout(Timer t) {
-    _connection.stop(
-        error: GeneralError(
-            "Server timeout elapsed without receiving a message from the server."))
-        ?.catchError((Object _) {
-      _logger?.finer("Error during server timeout stop: $_");
-    });
+    final stopFuture = _connection.stop(
+      error: GeneralError(
+        "Server timeout elapsed without receiving a message from the server.",
+      ),
+    );
+    if (stopFuture != null) {
+      unawaited(stopFuture.catchError((Object e, StackTrace _) {
+        _logger.finer(
+            "Could not shutdown connection after server timeout: $e");
+      }));
+    }
   }
 
   void _invokeClientMethod(InvocationMessage invocationMessage) {
-    final methods = _methods[invocationMessage.target!.toLowerCase()];
+    final target = invocationMessage.target;
+    if (target == null) {
+      _logger.warning('Invocation received with null target.');
+      return;
+    }
+    final methods = _methods[target.toLowerCase()];
     if (methods != null) {
       methods.forEach((m) => m(invocationMessage.arguments));
       if (!isStringEmpty(invocationMessage.invocationId)) {
         // This is not supported in v1. So we return an error to avoid blocking the server waiting for the response.
         final message =
             "Server requested a response, which is not supported in this version of the client.";
-        _logger?.severe(message);
+        _logger.severe(message);
 
         // We don't need to wait on this Promise.
         _stopPromise = _stopInternal(error: GeneralError(message));
       }
     } else {
-      _logger?.warning(
-          "No client method with the name '${invocationMessage.target}' found.");
+      _logger.warning("No client method with the name '$target' found.");
     }
   }
 
   void _connectionClosed({Exception? error}) {
-    _logger?.finer(
+    _logger.finer(
         "HubConnection.connectionClosed($error) called while in state $_connectionState.");
 
     // Triggering this.handshakeRejecter is insufficient because it could already be resolved without the continuation having run yet.
@@ -722,8 +703,9 @@ class HubConnection {
 
     // If the handshake is in progress, start will be waiting for the handshake promise, so we complete it.
     // If it has already completed, this should just noop.
-    if (_handshakeCompleter != null) {
-      if (!_handshakeCompleter!.isCompleted) _handshakeCompleter!.complete();
+    final handshake = _handshakeCompleter;
+    if (handshake != null && !handshake.isCompleted) {
+      handshake.complete();
     }
 
     _cancelCallbacksWithError(error ??
@@ -737,8 +719,6 @@ class HubConnection {
       _completeClose(error: error);
     } else if (_connectionState == HubConnectionState.Connected) {
       _reconnect(error: error);
-    } else if (_connectionState == HubConnectionState.Connected) {
-      _completeClose(error: error);
     }
 
     // If none of the above if conditions were true were called the HubConnection must be in either:
@@ -756,7 +736,7 @@ class HubConnection {
       try {
         _closedCallbacks.forEach((c) => c(error: error)); // removed "this"
       } catch (e) {
-        _logger?.severe(
+        _logger.severe(
             "An onclose callback called with error '$error' threw error '$e'.");
       }
     }
@@ -773,7 +753,7 @@ class HubConnection {
         _getNextRetryDelay(previousReconnectAttempts++, 0, retryError);
 
     if (nextRetryDelay == null) {
-      _logger?.finer(
+      _logger.finer(
           "Connection not reconnecting because the IRetryPolicy returned null on the first reconnect attempt.");
       _completeClose(error: error);
       return;
@@ -782,33 +762,33 @@ class HubConnection {
     _connectionState = HubConnectionState.Reconnecting;
 
     if (error != null) {
-      _logger?.info("Connection reconnecting because of error '$error'.");
+      _logger.info("Connection reconnecting because of error '$error'.");
     } else {
-      _logger?.info("Connection reconnecting.");
+      _logger.info("Connection reconnecting.");
     }
 
     try {
       _reconnectingCallbacks.forEach((c) => c(error: error));
     } catch (e) {
-      _logger?.severe(
+      _logger.severe(
           "An onreconnecting callback called with error '$error' threw error '$e'.");
     }
 
     // Exit early if an onreconnecting callback called connection.stop().
     if (_connectionState != HubConnectionState.Reconnecting) {
-      _logger?.finer(
+      _logger.finer(
           "Connection left the reconnecting state in onreconnecting callback. Done reconnecting.");
       return;
     }
 
     while (nextRetryDelay != null) {
-      _logger?.info(
+      _logger.info(
           "Reconnect attempt number $previousReconnectAttempts will start in $nextRetryDelay ms.");
 
       await Future.delayed(Duration(milliseconds: nextRetryDelay));
 
       if (_connectionState != HubConnectionState.Reconnecting) {
-        _logger?.finer(
+        _logger.finer(
             "Connection left the reconnecting state during reconnect delay. Done reconnecting.");
         return;
       }
@@ -817,22 +797,22 @@ class HubConnection {
         await _startInternal();
 
         _connectionState = HubConnectionState.Connected;
-        _logger?.info("HubConnection reconnected successfully.");
+        _logger.info("HubConnection reconnected successfully.");
 
         try {
           _reconnectedCallbacks
               .forEach((c) => c(connectionId: _connection.connectionId));
         } catch (e) {
-          _logger?.severe(
-              "An onreconnected callback called with connectionId '${_connection.connectionId}; threw error '$e'.");
+          _logger.severe(
+              "An onreconnected callback called with connectionId '${_connection.connectionId}' threw error '$e'.");
         }
 
         return;
       } catch (e) {
-        _logger?.info("Reconnect attempt failed because of error '$e'.");
+        _logger.info("Reconnect attempt failed because of error '$e'.");
 
         if (_connectionState != HubConnectionState.Reconnecting) {
-          _logger?.finer(
+          _logger.finer(
               "Connection left the reconnecting state during reconnect attempt. Done reconnecting.");
           return;
         }
@@ -845,7 +825,7 @@ class HubConnection {
       }
     }
 
-    _logger?.info(
+    _logger.info(
         "Reconnect retries have been exhausted after ${DateTime.now().difference(reconnectStartTime).inMilliseconds} ms and $previousReconnectAttempts failed attempts. Connection disconnecting.");
 
     _completeClose();
@@ -857,7 +837,7 @@ class HubConnection {
       return _reconnectPolicy.nextRetryDelayInMilliseconds(
           RetryContext(elapsedMilliseconds, previousRetryCount, retryReason));
     } catch (e) {
-      _logger?.severe(
+      _logger.severe(
           "IRetryPolicy.nextRetryDelayInMilliseconds($previousRetryCount, $elapsedMilliseconds) threw error '$e'.");
       return null;
     }
@@ -872,22 +852,25 @@ class HubConnection {
   }
 
   void _cleanupPingTimer() {
-    if (_pingServerTimer != null) {
-      _pingServerTimer!.cancel();
+    final t = _pingServerTimer;
+    if (t != null) {
+      t.cancel();
       _pingServerTimer = null;
     }
   }
 
   void _cleanupTimeout() {
-    if (_timeoutTimer != null) {
-      _timeoutTimer!.cancel();
+    final t = _timeoutTimer;
+    if (t != null) {
+      t.cancel();
       _timeoutTimer = null;
     }
   }
 
   void _cleanupReconnectTimer() {
-    if (_reconnectDelayTimer != null) {
-      _reconnectDelayTimer!.cancel();
+    final t = _reconnectDelayTimer;
+    if (t != null) {
+      t.cancel();
       _reconnectDelayTimer = null;
     }
   }
@@ -903,7 +886,7 @@ class HubConnection {
           invocationId: null);
     } else {
       final invocationId = _invocationId;
-      _invocationId = _invocationId! + 1;
+      _invocationId = _invocationId + 1;
 
       return InvocationMessage(
           target: methodName,
@@ -948,14 +931,13 @@ class HubConnection {
   }
 
   Map<String, Stream<Object>> _replaceStreamingParams(List<Object> args) {
-    final Map<String, Stream<Object>> streams =
-        new Map<String, Stream<Object>>();
+    final streams = <String, Stream<Object>>{};
 
     for (var i = 0; i < args.length; i++) {
       final argument = args[i];
       if (argument is Stream) {
-        final streamId = _invocationId!;
-        _invocationId = _invocationId! + 1;
+        final streamId = _invocationId;
+        _invocationId = _invocationId + 1;
         // Store the stream for later use
         streams[streamId.toString()] = argument as Stream<Object>;
 
@@ -972,7 +954,7 @@ class HubConnection {
   StreamInvocationMessage _createStreamInvocation(
       String methodName, List<Object> args, List<String> streamIds) {
     final invocationId = _invocationId;
-    _invocationId = _invocationId! + 1;
+    _invocationId = _invocationId + 1;
 
     return StreamInvocationMessage(
         target: methodName,
@@ -984,7 +966,7 @@ class HubConnection {
 
   CancelInvocationMessage _createCancelInvocation(String? id) {
     return CancelInvocationMessage(
-        headers: new MessageHeaders(), invocationId: id);
+        headers: MessageHeaders(), invocationId: id);
   }
 
   StreamItemMessage _createStreamItemMessage(String id, Object item) {

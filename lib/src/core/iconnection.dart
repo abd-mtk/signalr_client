@@ -1,12 +1,10 @@
 import 'dart:async';
 
-import "itransport.dart";
+import 'itransport.dart';
 
 class ConnectionFeatures {
-  // Properties
   bool? inherentKeepAlive;
 
-  // Methods
   ConnectionFeatures(this.inherentKeepAlive);
 }
 

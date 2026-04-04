@@ -4,14 +4,17 @@ import 'errors.dart';
 
 /// Specifies a specific HTTP transport type.
 enum HttpTransportType {
-  /// Specified no transport preference. */
-  None, // = 0,
-  /// Specifies the WebSockets transport. */
-  WebSockets, // = 1,
-  /// Specifies the Server-Sent Events transport. */
-  ServerSentEvents, // = 2,
-  /// Specifies the Long Polling transport. */
-  LongPolling, // = 4,
+  /// Specified no transport preference.
+  None,
+
+  /// Specifies the WebSockets transport.
+  WebSockets,
+
+  /// Specifies the Server-Sent Events transport.
+  ServerSentEvents,
+
+  /// Specifies the Long Polling transport.
+  LongPolling,
 }
 
 HttpTransportType httpTransportTypeFromString(String? value) {
@@ -28,18 +31,20 @@ HttpTransportType httpTransportTypeFromString(String? value) {
     case "LONGPOLLING":
       return HttpTransportType.LongPolling;
     default:
-      throw new GeneralError("$value is not a supported HttpTransportType");
+      throw GeneralError("$value is not a supported HttpTransportType");
   }
 }
 
 /// Specifies the transfer format for a connection.
 enum TransferFormat {
   /// TransferFormat is not defined.
-  Undefined, // = 0,
+  Undefined,
+
   /// Specifies that only text data will be transmitted over the connection.
-  Text, // = 1,
+  Text,
+
   /// Specifies that binary data will be transmitted over the connection.
-  Binary, // = 2,
+  Binary,
 }
 
 TransferFormat getTransferFormatFromString(String? value) {
@@ -54,7 +59,7 @@ TransferFormat getTransferFormatFromString(String? value) {
     case "BINARY":
       return TransferFormat.Binary;
     default:
-      throw new GeneralError("$value is not a supported HttpTransportType");
+      throw GeneralError("$value is not a supported TransferFormat");
   }
 }
 
@@ -62,12 +67,11 @@ TransferFormat getTransferFormatFromString(String? value) {
 /// data: the content. Either a string (json) or Uint8List (binary)
 typedef OnReceive = void Function(Object? data);
 
-///
 typedef OnClose = void Function({Exception? error});
 
 typedef AccessTokenFactory = Future<String> Function();
 
-/// An abstraction over the behavior of transports. This is designed to support the framework and not intended for use by applications.
+/// An abstraction over the behavior of transports.
 abstract class ITransport {
   Future<void> connect(String? url, TransferFormat transferFormat);
 

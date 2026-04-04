@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'errors.dart';
+import '../core/errors.dart';
 import 'text_message_format.dart';
 
 /// private
@@ -59,9 +59,12 @@ class HandshakeProtocol {
   /// Parse the handshake reponse
   /// data: either a string (json) or a Uint8List (binary) of the handshake response data.
   ParseHandshakeResponseResult parseHandshakeResponse(Object? data) {
-    HandshakeResponseMessage responseMessage;
-    String messageData;
+    late String messageData;
     Object? remainingData;
+
+    if (data == null) {
+      throw GeneralError('Handshake response data is null.');
+    }
 
     if (data is Uint8List) {
       // Format is binary but still need to read JSON text from handshake response
@@ -77,8 +80,8 @@ class HandshakeProtocol {
       remainingData = (data.length > responseLength)
           ? data.sublist(responseLength, data.length)
           : null;
-    } else {
-      final String textData = data as String;
+    } else if (data is String) {
+      final textData = data;
       final separatorIndex =
           textData.indexOf(TextMessageFormat.recordSeparator);
       if (separatorIndex == -1) {
@@ -92,22 +95,22 @@ class HandshakeProtocol {
       remainingData = (textData.length > responseLength)
           ? textData.substring(responseLength)
           : null;
+    } else {
+      throw GeneralError(
+        'Handshake response must be String or Uint8List, got ${data.runtimeType}.',
+      );
     }
 
     // At this point we should have just the single handshake message
     final messages = TextMessageFormat.parse(messageData);
+    if (messages.isEmpty) {
+      throw GeneralError('Handshake response contained no JSON payload.');
+    }
     final response =
         HandshakeResponseMessage.fromJson(json.decode(messages[0]));
 
-    // NOTE: The fromJson should have thrown an error before this check would be required.
-    // if (response.type) {
-    //     throw new Error("Expected a handshake response from the server.");
-    // }
-
-    responseMessage = response;
-
     // multiple messages could have arrived with handshake
     // return additional data to be parsed as usual, or null if all parsed
-    return ParseHandshakeResponseResult(remainingData, responseMessage);
+    return ParseHandshakeResponseResult(remainingData, response);
   }
 }
