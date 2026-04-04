@@ -837,7 +837,7 @@ class HubConnection {
           return;
         }
 
-        retryError = Exception(e);
+        retryError = e is Exception ? e : GeneralError(e.toString());
         nextRetryDelay = _getNextRetryDelay(
             previousReconnectAttempts++,
             DateTime.now().difference(reconnectStartTime).inMilliseconds,
