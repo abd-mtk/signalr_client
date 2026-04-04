@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:logging/logging.dart';
 import "package:message_pack_dart/message_pack_dart.dart" as msgpack;
 
-import '../core/errors.dart';
+import '../core/signalr_exception.dart';
 import '../core/itransport.dart';
 import 'binary_message_format.dart';
 import 'ihub_protocol.dart';
@@ -27,8 +27,10 @@ class MessagePackHubProtocol implements IHubProtocol {
   @override
   List<HubMessageBase> parseMessages(Object input, Logger logger) {
     if (input is! Uint8List) {
-      throw GeneralError(
-          "Invalid input for MessagePack hub protocol. Expected an Uint8List.");
+      throw SignalRException(
+          message:
+              "Invalid input for MessagePack hub protocol. Expected an Uint8List.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     final binaryInput = input;
@@ -36,26 +38,36 @@ class MessagePackHubProtocol implements IHubProtocol {
 
     final messages = BinaryMessageFormat.parse(binaryInput);
     if (messages.isEmpty) {
-      throw GeneralError('No MessagePack frames in payload.');
+      throw SignalRException(
+          message: 'No MessagePack frames in payload.',
+          type: SignalRExceptionType.invalidPayload);
     }
 
     for (var message in messages) {
       if (message.isEmpty) {
-        throw GeneralError('Empty MessagePack frame in payload.');
+        throw SignalRException(
+            message: 'Empty MessagePack frame in payload.',
+            type: SignalRExceptionType.invalidPayload);
       }
 
       final unpackedData = msgpack.deserialize(message);
       List<dynamic> unpackedList;
       if (unpackedData == null) {
-        throw GeneralError('MessagePack deserialized to null.');
+        throw SignalRException(
+            message: 'MessagePack deserialized to null.',
+            type: SignalRExceptionType.invalidPayload);
       }
       try {
         unpackedList = List<dynamic>.from(unpackedData as List<dynamic>);
       } catch (_) {
-        throw GeneralError("Invalid payload.");
+        throw SignalRException(
+            message: "Invalid payload.",
+            type: SignalRExceptionType.invalidPayload);
       }
       if (unpackedList.isEmpty) {
-        throw GeneralError('MessagePack message array is empty.');
+        throw SignalRException(
+            message: 'MessagePack message array is empty.',
+            type: SignalRExceptionType.invalidPayload);
       }
       final messageObj = _parseMessage(unpackedList, logger);
       if (messageObj != null) {
@@ -67,14 +79,18 @@ class MessagePackHubProtocol implements IHubProtocol {
 
   static HubMessageBase? _parseMessage(List<dynamic> data, Logger logger) {
     if (data.isEmpty) {
-      throw GeneralError("Invalid payload.");
+      throw SignalRException(
+          message: "Invalid payload.",
+          type: SignalRExceptionType.invalidPayload);
     }
     HubMessageBase? messageObj;
 
     final rawType = data[0];
     if (rawType is! int) {
-      throw GeneralError(
-          "Invalid message type value: expected int, got ${rawType.runtimeType}.");
+      throw SignalRException(
+          message:
+              "Invalid message type value: expected int, got ${rawType.runtimeType}.",
+          type: SignalRExceptionType.invalidPayload);
     }
     final messageType = rawType;
 
@@ -115,12 +131,16 @@ class MessagePackHubProtocol implements IHubProtocol {
 
   static MessageHeaders createMessageHeaders(List<dynamic> data) {
     if (data.length < 2) {
-      throw GeneralError("Invalid headers");
+      throw SignalRException(
+          message: "Invalid headers",
+          type: SignalRExceptionType.invalidPayload);
     }
     final raw = data[1];
     if (raw == null) return MessageHeaders();
     if (raw is! Map) {
-      throw GeneralError("Invalid headers");
+      throw SignalRException(
+          message: "Invalid headers",
+          type: SignalRExceptionType.invalidPayload);
     }
     final headers = MessageHeaders();
     for (final entry in raw.entries) {
@@ -134,15 +154,19 @@ class MessagePackHubProtocol implements IHubProtocol {
 
   static InvocationMessage _createInvocationMessage(List<dynamic> data) {
     if (data.length < 5) {
-      throw GeneralError("Invalid payload for Invocation message.");
+      throw SignalRException(
+          message: "Invalid payload for Invocation message.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     final MessageHeaders headers = createMessageHeaders(data);
 
     final rawArgs = data[4];
     if (rawArgs is! List) {
-      throw GeneralError(
-          "Invalid payload for Invocation message: arguments must be a List.");
+      throw SignalRException(
+          message:
+              "Invalid payload for Invocation message: arguments must be a List.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     return InvocationMessage(
@@ -156,15 +180,19 @@ class MessagePackHubProtocol implements IHubProtocol {
   static StreamInvocationMessage _createStreamInvocationMessage(
       List<dynamic> data) {
     if (data.length < 5) {
-      throw GeneralError("Invalid payload for StreamInvocation message.");
+      throw SignalRException(
+          message: "Invalid payload for StreamInvocation message.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     final MessageHeaders headers = createMessageHeaders(data);
 
     final rawArgs = data[4];
     if (rawArgs is! List) {
-      throw GeneralError(
-          "Invalid payload for StreamInvocation message: arguments must be a List.");
+      throw SignalRException(
+          message:
+              "Invalid payload for StreamInvocation message: arguments must be a List.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     return StreamInvocationMessage(
@@ -180,7 +208,9 @@ class MessagePackHubProtocol implements IHubProtocol {
 
   static StreamItemMessage _createStreamItemMessage(List<dynamic> data) {
     if (data.length < 4) {
-      throw GeneralError("Invalid payload for StreamItem message.");
+      throw SignalRException(
+          message: "Invalid payload for StreamItem message.",
+          type: SignalRExceptionType.invalidPayload);
     }
     final MessageHeaders headers = createMessageHeaders(data);
     final message = StreamItemMessage(
@@ -194,12 +224,16 @@ class MessagePackHubProtocol implements IHubProtocol {
 
   static CompletionMessage _createCompletionMessage(List<dynamic> data) {
     if (data.length < 4) {
-      throw GeneralError("Invalid payload for Completion message.");
+      throw SignalRException(
+          message: "Invalid payload for Completion message.",
+          type: SignalRExceptionType.invalidPayload);
     }
     final MessageHeaders headers = createMessageHeaders(data);
     final resultKind = data[3];
     if (resultKind != _voidResult && data.length < 5) {
-      throw GeneralError("Invalid payload for Completion message.");
+      throw SignalRException(
+          message: "Invalid payload for Completion message.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     if (resultKind == _errorResult) {
@@ -228,14 +262,18 @@ class MessagePackHubProtocol implements IHubProtocol {
 
   static PingMessage _createPingMessage(List<dynamic> data) {
     if (data.isEmpty) {
-      throw GeneralError("Invalid payload for Ping message.");
+      throw SignalRException(
+          message: "Invalid payload for Ping message.",
+          type: SignalRExceptionType.invalidPayload);
     }
     return PingMessage();
   }
 
   static CloseMessage _createCloseMessage(List<dynamic> data) {
     if (data.length < 2) {
-      throw GeneralError("Invalid payload for Close message.");
+      throw SignalRException(
+          message: "Invalid payload for Close message.",
+          type: SignalRExceptionType.invalidPayload);
     }
     if (data.length >= 3) {
       return CloseMessage(allowReconnect: data[2], error: data[1]);
@@ -261,10 +299,10 @@ class MessagePackHubProtocol implements IHubProtocol {
       case MessageType.cancelInvocation:
         return _writeCancelInvocation(message as CancelInvocationMessage);
       default:
-        throw GeneralError("Invalid message type.");
+        throw SignalRException(
+            message: "Invalid message type.",
+            type: SignalRExceptionType.invalidPayload);
     }
-
-    //throw GeneralError("Converting '${message.type}' is not implemented.");
   }
 
   /// Serializes a payload list with MessagePack and wraps it in a binary frame.

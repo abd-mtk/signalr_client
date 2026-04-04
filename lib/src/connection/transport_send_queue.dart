@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../core/errors.dart';
-import '../core/itransport.dart';
 import '../core/signalr_exception.dart';
+import '../core/itransport.dart';
 
 class TransportSendQueue {
   /// Default maximum number of messages that can be buffered before rejection.
@@ -17,7 +16,8 @@ class TransportSendQueue {
   final ITransport transport;
   final int maxBufferSize;
 
-  TransportSendQueue(this.transport, {this.maxBufferSize = defaultMaxBufferSize}) {
+  TransportSendQueue(this.transport,
+      {this.maxBufferSize = defaultMaxBufferSize}) {
     _sendBufferedData = Completer<void>();
     _transportResult = Completer<void>();
     _sendLoopPromise = _sendLoop();
@@ -40,23 +40,25 @@ class TransportSendQueue {
   }
 
   void _bufferData(Object? data) {
-    if (data is Uint8List &&
-        _buffer.isNotEmpty &&
-        _buffer[0] is! Uint8List) {
-      throw GeneralError(
-        "Expected data to be of type ${_buffer[0].runtimeType} but got Uint8List",
+    if (data is Uint8List && _buffer.isNotEmpty && _buffer[0] is! Uint8List) {
+      throw SignalRException(
+        message:
+            "Expected data to be of type ${_buffer[0].runtimeType} but got Uint8List",
+        type: SignalRExceptionType.signalr,
       );
-    } else if (data is String &&
-        _buffer.isNotEmpty &&
-        _buffer[0] is! String) {
-      throw GeneralError(
-        "Expected data to be of type ${_buffer[0].runtimeType} but got String",
+    } else if (data is String && _buffer.isNotEmpty && _buffer[0] is! String) {
+      throw SignalRException(
+        message:
+            "Expected data to be of type ${_buffer[0].runtimeType} but got String",
+        type: SignalRExceptionType.signalr,
       );
     }
 
     if (_buffer.length >= maxBufferSize) {
-      throw GeneralError(
-          'Send buffer is full ($maxBufferSize messages). The transport may be too slow or disconnected.');
+      throw SignalRException(
+          message:
+              'Send buffer is full ($maxBufferSize messages). The transport may be too slow or disconnected.',
+          type: SignalRExceptionType.signalr);
     }
 
     _buffer.add(data);
@@ -70,7 +72,9 @@ class TransportSendQueue {
       if (!_executing) {
         final pending = _transportResult;
         if (pending != null && !pending.isCompleted) {
-          pending.completeError(GeneralError('Connection stopped.'));
+          pending.completeError(SignalRException(
+              message: 'Connection stopped.',
+              type: SignalRExceptionType.signalr));
         }
         break;
       }
@@ -108,7 +112,11 @@ class TransportSendQueue {
         if (!transportResult.isCompleted) transportResult.complete();
       } catch (error, st) {
         if (!transportResult.isCompleted) {
-          transportResult.completeError(toSignalRException(error, st));
+          transportResult.completeError(SignalRException.handler(
+              error: error,
+              message: error.toString(),
+              type: SignalRExceptionType.signalr,
+              stackTrace: st));
         }
       }
     }
@@ -118,7 +126,9 @@ class TransportSendQueue {
     final builder = BytesBuilder(copy: false);
     for (final b in arrayBuffers) {
       if (b == null) {
-        throw GeneralError('concatBuffers: null buffer segment');
+        throw SignalRException(
+            message: 'concatBuffers: null buffer segment',
+            type: SignalRExceptionType.signalr);
       }
       builder.add(b);
     }

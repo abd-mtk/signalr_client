@@ -2,10 +2,9 @@ import 'dart:async';
 
 import 'package:logging/logging.dart';
 
-import '../core/errors.dart';
+import '../core/signalr_exception.dart';
 import '../core/iconnection.dart';
 import '../core/iretry_policy.dart';
-import '../core/signalr_exception.dart';
 import '../protocol/handshake_protocol.dart';
 import '../protocol/ihub_protocol.dart';
 import '../shared/utils.dart';
@@ -13,9 +12,9 @@ import 'hub_connection_state.dart';
 
 /// Connection to an ASP.NET Core SignalR hub.
 ///
-/// Failures from [start], [invoke], [stream], and [stop] are surfaced as [Exception].
-/// On web, underlying JS errors are wrapped in [SignalRError]; use [SignalRError.original]
-/// for the raw value when debugging.
+/// Failures from [start], [invoke], [stream], and [stop] are surfaced as
+/// [SignalRException]. Use [SignalRException.toJson] for
+/// structured diagnostics.
 class HubConnection {
   // Either a string (json) or Uint8List (binary);
   Object? _cachedPingMessage;
@@ -92,12 +91,16 @@ class HubConnection {
   set baseUrl(String? url) {
     if (_connectionState != HubConnectionState.disconnected &&
         _connectionState != HubConnectionState.reconnecting) {
-      throw GeneralError(
-          "The HubConnection must be in the Disconnected or Reconnecting state to change the url.");
+      throw SignalRException(
+          message:
+              "The HubConnection must be in the Disconnected or Reconnecting state to change the url.",
+          type: SignalRExceptionType.signalr);
     }
 
     if (url == null) {
-      throw GeneralError("The HubConnection url must be a valid url.");
+      throw SignalRException(
+          message: "The HubConnection url must be a valid url.",
+          type: SignalRExceptionType.signalr);
     }
 
     _connection.baseUrl = url;
@@ -117,10 +120,7 @@ class HubConnection {
     );
   }
 
-  HubConnection(
-    IConnection connection,
-    Logger logger,
-    IHubProtocol protocol,
+  HubConnection(IConnection connection, Logger logger, IHubProtocol protocol,
       {IRetryPolicy? reconnectPolicy})
       : _connection = connection,
         _logger = logger,
@@ -158,8 +158,10 @@ class HubConnection {
 
   Future<void> _startWithStateTransitions() async {
     if (_connectionState != HubConnectionState.disconnected) {
-      return Future.error(GeneralError(
-          "Cannot start a HubConnection that is not in the 'Disconnected' state."));
+      return Future.error(SignalRException(
+          message:
+              "Cannot start a HubConnection that is not in the 'Disconnected' state.",
+          type: SignalRExceptionType.signalr));
     }
 
     _connectionState = HubConnectionState.connecting;
@@ -227,7 +229,11 @@ class HubConnection {
       // HttpConnection.stop() should not complete until after the onclose callback is invoked.
       // This will transition the HubConnection to the disconnected state before HttpConnection.stop() completes.
       await _connection.stop(
-        error: toSignalRException(e),
+        error: SignalRException.handler(
+            error: e,
+            message: e.toString(),
+            type: SignalRExceptionType.signalr,
+            stackTrace: null),
       );
       rethrow;
     }
@@ -284,8 +290,10 @@ class HubConnection {
     _cancelStreamSubscriptions();
     _cancelAllTimers();
     _stopDuringStartError = error ??
-        GeneralError(
-            "The connection was stopped before the hub handshake could complete.");
+        SignalRException(
+            message:
+                "The connection was stopped before the hub handshake could complete.",
+            type: SignalRExceptionType.signalr);
 
     // HttpConnection.stop() should not complete until after either HttpConnection.start() fails
     // or the onclose callback is invoked. The onclose callback will transition the HubConnection
@@ -337,7 +345,9 @@ class HubConnection {
         // invocationEvent will not be null when an error is not passed to the callback
         if (invocationEvent is CompletionMessage) {
           if (invocationEvent.error != null) {
-            streamController.addError(GeneralError(invocationEvent.error));
+            streamController.addError(SignalRException(
+                message: invocationEvent.error ?? 'Unknown error',
+                type: SignalRExceptionType.signalr));
           } else {
             streamController.close();
           }
@@ -415,7 +425,9 @@ class HubConnection {
         if (invocationEvent is CompletionMessage) {
           if (invocationEvent.error != null) {
             if (!completer.isCompleted) {
-              completer.completeError(GeneralError(invocationEvent.error));
+              completer.completeError(SignalRException(
+                  message: invocationEvent.error ?? 'Unknown error',
+                  type: SignalRExceptionType.signalr));
             }
           } else {
             if (!completer.isCompleted) {
@@ -424,8 +436,9 @@ class HubConnection {
           }
         } else {
           if (!completer.isCompleted) {
-            completer.completeError(GeneralError(
-                "Unexpected message type: ${invocationEvent.type}"));
+            completer.completeError(SignalRException(
+                message: "Unexpected message type: ${invocationEvent.type}",
+                type: SignalRExceptionType.signalr));
           }
         }
       }
@@ -562,7 +575,9 @@ class HubConnection {
 
             final closeErr = closeMessage.error;
             final Exception? error = closeErr != null
-                ? GeneralError("Server returned an error on close: $closeErr")
+                ? SignalRException(
+                    message: "Server returned an error on close: $closeErr",
+                    type: SignalRExceptionType.signalr)
                 : null;
 
             if (closeMessage.allowReconnect == true) {
@@ -595,13 +610,15 @@ class HubConnection {
     } catch (e) {
       final message = "Error parsing handshake response: '${e.toString()}'.";
       _logger.severe(message);
-      return _failHandshake(GeneralError(message));
+      return _failHandshake(SignalRException(
+          message: message, type: SignalRExceptionType.signalr));
     }
     if (!isStringEmpty(handshakeResult.handshakeResponseMessage.error)) {
       final message =
           "Server returned handshake error: '${handshakeResult.handshakeResponseMessage.error}'";
       _logger.severe(message);
-      return _failHandshake(GeneralError(message));
+      return _failHandshake(SignalRException(
+          message: message, type: SignalRExceptionType.signalr));
     } else {
       _logger.finer("Server handshake complete.");
     }
@@ -656,14 +673,15 @@ class HubConnection {
 
   void _serverTimeout(Timer t) {
     final stopFuture = _connection.stop(
-      error: GeneralError(
-        "Server timeout elapsed without receiving a message from the server.",
+      error: SignalRException(
+        message:
+            "Server timeout elapsed without receiving a message from the server.",
+        type: SignalRExceptionType.timeout,
       ),
     );
     if (stopFuture != null) {
       unawaited(stopFuture.catchError((Object e, StackTrace _) {
-        _logger.finer(
-            "Could not shutdown connection after server timeout: $e");
+        _logger.finer("Could not shutdown connection after server timeout: $e");
       }));
     }
   }
@@ -686,7 +704,9 @@ class HubConnection {
         _logger.severe(message);
 
         // We don't need to wait on this Promise.
-        _stopPromise = _stopInternal(error: GeneralError(message));
+        _stopPromise = _stopInternal(
+            error: SignalRException(
+                message: message, type: SignalRExceptionType.signalr));
       }
     } else {
       _logger.warning("No client method with the name '$target' found.");
@@ -700,8 +720,10 @@ class HubConnection {
     // Triggering this.handshakeRejecter is insufficient because it could already be resolved without the continuation having run yet.
     _stopDuringStartError = _stopDuringStartError ??
         error ??
-        GeneralError(
-            "The underlying connection was closed before the hub handshake could complete.");
+        SignalRException(
+            message:
+                "The underlying connection was closed before the hub handshake could complete.",
+            type: SignalRExceptionType.signalr);
 
     // If the handshake is in progress, start will be waiting for the handshake promise, so we complete it.
     // If it has already completed, this should just noop.
@@ -711,8 +733,10 @@ class HubConnection {
     }
 
     _cancelCallbacksWithError(error ??
-        GeneralError(
-            "Invocation canceled due to the underlying connection being closed."));
+        SignalRException(
+            message:
+                "Invocation canceled due to the underlying connection being closed.",
+            type: SignalRExceptionType.signalr));
 
     _cancelStreamSubscriptions();
     _cancelAllTimers();
@@ -749,7 +773,10 @@ class HubConnection {
   _reconnect({Exception? error}) async {
     final reconnectStartTime = DateTime.now();
     var previousReconnectAttempts = 0;
-    Exception retryError = error ?? GeneralError("Attempting to reconnect due to a unknown error.");
+    Exception retryError = error ??
+        SignalRException(
+            message: "Attempting to reconnect due to a unknown error.",
+            type: SignalRExceptionType.signalr);
 
     var nextRetryDelay =
         _getNextRetryDelay(previousReconnectAttempts++, 0, retryError);
@@ -822,7 +849,11 @@ class HubConnection {
           return;
         }
 
-        retryError = toSignalRException(e);
+        retryError = SignalRException.handler(
+            error: e,
+            message: e.toString(),
+            type: SignalRExceptionType.signalr,
+            stackTrace: null);
         nextRetryDelay = _getNextRetryDelay(
             previousReconnectAttempts++,
             DateTime.now().difference(reconnectStartTime).inMilliseconds,
@@ -933,7 +964,12 @@ class HubConnection {
         promiseQueue = promiseQueue
             ?.then((_) => _sendWithProtocol(_createCompletionMessage(id)));
       }, onError: (err) {
-        final message = toSignalRException(err).toString();
+        final message = SignalRException.handler(
+                error: err,
+                message: err.toString(),
+                type: SignalRExceptionType.signalr,
+                stackTrace: null)
+            .toString();
 
         promiseQueue = promiseQueue?.then((_) =>
             _sendWithProtocol(_createCompletionMessage(id, error: message)));
@@ -977,8 +1013,7 @@ class HubConnection {
   }
 
   CancelInvocationMessage _createCancelInvocation(String? id) {
-    return CancelInvocationMessage(
-        headers: MessageHeaders(), invocationId: id);
+    return CancelInvocationMessage(headers: MessageHeaders(), invocationId: id);
   }
 
   StreamItemMessage _createStreamItemMessage(String id, Object item) {

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import '../core/errors.dart';
+import '../core/signalr_exception.dart';
 import 'text_message_format.dart';
 
 /// private
@@ -63,14 +63,19 @@ class HandshakeProtocol {
     Object? remainingData;
 
     if (data == null) {
-      throw GeneralError('Handshake response data is null.');
+      throw SignalRException(
+          message: 'Handshake response data is null.',
+          type: SignalRExceptionType.signalr);
     }
 
     if (data is Uint8List) {
       // Format is binary but still need to read JSON text from handshake response
-      final int separatorIndex = data.indexOf(TextMessageFormat.RecordSeparatorCode);
+      final int separatorIndex =
+          data.indexOf(TextMessageFormat.RecordSeparatorCode);
       if (separatorIndex == -1) {
-        throw GeneralError("Message is incomplete.");
+        throw SignalRException(
+            message: "Message is incomplete.",
+            type: SignalRExceptionType.invalidPayload);
       }
 
       // content before separator is handshake response
@@ -85,7 +90,9 @@ class HandshakeProtocol {
       final separatorIndex =
           textData.indexOf(TextMessageFormat.recordSeparator);
       if (separatorIndex == -1) {
-        throw GeneralError("Message is incomplete.");
+        throw SignalRException(
+            message: "Message is incomplete.",
+            type: SignalRExceptionType.invalidPayload);
       }
 
       // content before separator is handshake response
@@ -96,15 +103,19 @@ class HandshakeProtocol {
           ? textData.substring(responseLength)
           : null;
     } else {
-      throw GeneralError(
-        'Handshake response must be String or Uint8List, got ${data.runtimeType}.',
+      throw SignalRException(
+        message:
+            'Handshake response must be String or Uint8List, got ${data.runtimeType}.',
+        type: SignalRExceptionType.invalidPayload,
       );
     }
 
     // At this point we should have just the single handshake message
     final messages = TextMessageFormat.parse(messageData);
     if (messages.isEmpty) {
-      throw GeneralError('Handshake response contained no JSON payload.');
+      throw SignalRException(
+          message: 'Handshake response contained no JSON payload.',
+          type: SignalRExceptionType.invalidPayload);
     }
     final response =
         HandshakeResponseMessage.fromJson(json.decode(messages[0]));

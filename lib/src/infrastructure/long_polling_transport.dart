@@ -3,9 +3,8 @@ import 'dart:async';
 import 'package:logging/logging.dart';
 
 import '../core/abort_controller.dart';
-import '../core/errors.dart';
-import '../core/itransport.dart';
 import '../core/signalr_exception.dart';
+import '../core/itransport.dart';
 import '../protocol/ihub_protocol.dart';
 import '../protocol/signalr_http_client.dart';
 import '../shared/utils.dart';
@@ -23,7 +22,7 @@ class LongPollingTransport implements ITransport {
   String? _url;
   late bool _running;
   Future<void>? _receiving;
-  Object? _closeError;
+  Exception? _closeError;
   bool _onCloseRaised = false;
 
   @override
@@ -50,7 +49,9 @@ class LongPollingTransport implements ITransport {
   Future<void> connect(String? url, TransferFormat transferFormat) async {
     if (url == null || isStringEmpty(url)) {
       return Future.error(
-        GeneralError('Long polling requires a non-empty url.'),
+        SignalRException(
+            message: 'Long polling requires a non-empty url.',
+            type: SignalRExceptionType.signalr),
       );
     }
 
@@ -59,8 +60,10 @@ class LongPollingTransport implements ITransport {
     _logger.finest("(LongPolling transport) Connecting");
 
     if (transferFormat == TransferFormat.binary) {
-      throw GeneralError(
-        "Binary protocols via Long Polling Transport is not supported.",
+      throw SignalRException(
+        message:
+            "Binary protocols via Long Polling Transport is not supported.",
+        type: SignalRExceptionType.signalr,
       );
     }
 
@@ -81,7 +84,10 @@ class LongPollingTransport implements ITransport {
         "(LongPolling transport) Unexpected response code: ${response.statusCode}",
       );
 
-      _closeError = HttpError(response.statusText ?? "", response.statusCode);
+      _closeError = SignalRException(
+          message: "${response.statusCode}: ${response.statusText ?? ""}",
+          type: SignalRExceptionType.http,
+          statusCode: response.statusCode);
       _running = false;
     } else {
       _running = true;
@@ -119,8 +125,10 @@ class LongPollingTransport implements ITransport {
               "(LongPolling transport) Unexpected response code: ${response.statusCode}",
             );
 
-            _closeError =
-                HttpError(response.statusText ?? "", response.statusCode);
+            _closeError = SignalRException(
+                message: "${response.statusCode}: ${response.statusText ?? ""}",
+                type: SignalRExceptionType.http,
+                statusCode: response.statusCode);
             _running = false;
           } else {
             final content = response.content;
@@ -140,12 +148,16 @@ class LongPollingTransport implements ITransport {
               "(LongPolling transport) Poll errored after shutdown: ${e.toString()}",
             );
           } else {
-            if (e is TimeoutError) {
+            if (e is SignalRException && e.type.isTimeout) {
               _logger.finest(
                 "(LongPolling transport) Poll timed out, reissuing.",
               );
             } else {
-              _closeError = toSignalRException(e, st);
+              _closeError = SignalRException.handler(
+                  error: e,
+                  message: e.toString(),
+                  type: SignalRExceptionType.signalr,
+                  stackTrace: st);
               _running = false;
             }
           }
@@ -164,7 +176,9 @@ class LongPollingTransport implements ITransport {
   Future<void> send(Object data) async {
     if (!_running) {
       return Future.error(
-        GeneralError("Cannot send until the transport is connected"),
+        SignalRException(
+            message: "Cannot send until the transport is connected",
+            type: SignalRExceptionType.signalr),
       );
     }
     await sendMessage(
@@ -234,9 +248,6 @@ class LongPollingTransport implements ITransport {
     }
     _logger.finest(logMessage);
 
-    final err = _closeError;
-    final Exception? ex = err == null ? null : toSignalRException(err);
-
-    closeHandler(error: ex);
+    closeHandler(error: _closeError);
   }
 }

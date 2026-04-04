@@ -1,68 +1,140 @@
 import 'package:flutter/foundation.dart';
 
-import 'errors.dart';
+enum ExceptionType {
+  dartException,
+  jsInteropObject,
+  unknown;
 
-/// Wraps values thrown on the web or from interop that are not Dart [Exception]
-/// instances, so callers can rely on [Exception] in `catch` and callbacks.
-///
-/// Use [original] for debugging or advanced handling; [message] is safe to show.
-class SignalRError implements Exception {
+  static ExceptionType exceptionType(Object? error) {
+    if (error is Exception || error is Error) {
+      return ExceptionType.dartException;
+    } else if (kIsWeb) {
+      return ExceptionType.jsInteropObject;
+    } else {
+      return ExceptionType.unknown;
+    }
+  }
+}
+
+enum SignalRExceptionType {
+  http,
+  abort,
+  timeout,
+  notImplemented,
+  invalidPayload,
+  signalr,
+  unknown;
+
+  bool get isSignalr => this == SignalRExceptionType.signalr;
+  bool get isHttp => this == SignalRExceptionType.http;
+  bool get isAbort => this == SignalRExceptionType.abort;
+  bool get isTimeout => this == SignalRExceptionType.timeout;
+  bool get isNotImplemented => this == SignalRExceptionType.notImplemented;
+  bool get isInvalidPayload => this == SignalRExceptionType.invalidPayload;
+  bool get isUnknown => this == SignalRExceptionType.unknown;
+}
+
+class SignalRException implements Exception {
   final String message;
   final Object? original;
+  final int? statusCode;
   final StackTrace? stackTrace;
+  final SignalRExceptionType type;
+  SignalRException(
+      {required this.message,
+      this.original,
+      this.stackTrace,
+      this.statusCode,
+      this.type = SignalRExceptionType.unknown});
 
-  SignalRError(
-    this.message, {
-    this.original,
-    this.stackTrace,
-  });
+  static SignalRException handler({
+    int statusCode = 0,
+    required Object? error,
+    required String message,
+    required SignalRExceptionType type,
+    required StackTrace? stackTrace,
+  }) {
+    final exceptionType = ExceptionType.exceptionType(error);
+    switch (exceptionType) {
+      case ExceptionType.dartException:
+        return SignalRException(
+          type: type,
+          original: error,
+          message: message,
+          stackTrace: stackTrace,
+          statusCode: statusCode,
+        );
+      case ExceptionType.jsInteropObject:
+        return SignalRException(
+          type: type,
+          stackTrace: stackTrace,
+          statusCode: statusCode,
+          original: Exception(error.toString()),
+          message: "JAVASCRIPT ERROR TYPE: ${error.runtimeType}",
+        );
+      case ExceptionType.unknown:
+        return SignalRException(
+          type: type,
+          original: error,
+          statusCode: statusCode,
+          stackTrace: stackTrace,
+          message: "UNKNOWN ERROR TYPE: ${error.runtimeType}",
+        );
+    }
+  }
+
+  static SignalRException? tryHandler({
+    int statusCode = 0,
+    required Object? error,
+    required String message,
+    required SignalRExceptionType type,
+    required StackTrace? stackTrace,
+  }) {
+    if (error != null) {
+      final exceptionType = ExceptionType.exceptionType(error);
+      switch (exceptionType) {
+        case ExceptionType.dartException:
+          return SignalRException(
+            type: type,
+            original: error,
+            message: message,
+            stackTrace: stackTrace,
+            statusCode: statusCode,
+          );
+        case ExceptionType.jsInteropObject:
+          return SignalRException(
+            type: type,
+            stackTrace: stackTrace,
+            statusCode: statusCode,
+            original: Exception(error.toString()),
+            message: "JAVASCRIPT ERROR TYPE: ${error.runtimeType}",
+          );
+        case ExceptionType.unknown:
+          return SignalRException(
+            type: type,
+            original: error,
+            statusCode: statusCode,
+            stackTrace: stackTrace,
+            message: "UNKNOWN ERROR TYPE: ${error.runtimeType}",
+          );
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "type": type.name,
+      "message": message,
+      "statusCode": statusCode,
+      "original": original.toString(),
+      "stackTrace": stackTrace.toString(),
+      "runtimeType": original.runtimeType.toString(),
+    };
+  }
 
   @override
-  String toString() => message;
-}
-
-/// On web (DDC), JS values can satisfy `is Exception` while still failing
-/// `as Exception?` at async boundaries ([LegacyJavaScriptObject], etc.).
-bool _isWebJsValueMisTypedAsException(Exception error) {
-  if (!kIsWeb) return false;
-  final name = error.runtimeType.toString();
-  return name.contains('LegacyJavaScript') ||
-      name.contains('JavaScriptObject') ||
-      name == 'JSObject' ||
-      name.contains('Interop');
-}
-
-/// Converts any thrown value to an [Exception] for consistent handling.
-///
-/// Preserves [HttpError], [AbortError], [TimeoutError], [GeneralError], etc.
-Exception toSignalRException(Object? error, [StackTrace? stackTrace]) {
-  if (error == null) {
-    return SignalRError('Unknown error', stackTrace: stackTrace);
-  }
-  if (error is Exception) {
-    if (_isWebJsValueMisTypedAsException(error)) {
-      return SignalRError(
-        error.toString(),
-        original: error,
-        stackTrace: stackTrace,
-      );
-    }
-    return error;
-  }
-  if (error is String) {
-    return GeneralError(error);
-  }
-  try {
-    return SignalRError(
-      error.toString(),
-      original: error,
-      stackTrace: stackTrace,
-    );
-  } catch (_) {
-    return SignalRError(
-      'Unknown platform error',
-      original: error,
-      stackTrace: stackTrace,
-    );
+  String toString() {
+    return "TYPE: $type,\nSIGNALR EXCEPTION: $message,\nSTACK TRACE: $stackTrace";
   }
 }

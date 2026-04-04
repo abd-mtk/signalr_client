@@ -30,32 +30,55 @@ void main() {
   group('DefaultRetryPolicy.nextRetryDelayInMilliseconds', () {
     test('returns null when previousRetryCount is out of range (high)', () {
       final policy = DefaultRetryPolicy();
-      final ctx = RetryContext(0, 99, GeneralError('x'));
+      final ctx = RetryContext(0, 99,
+          SignalRException(message: 'x', type: SignalRExceptionType.signalr));
       expect(policy.nextRetryDelayInMilliseconds(ctx), isNull);
     });
 
     test('returns null when previousRetryCount is negative', () {
       final policy = DefaultRetryPolicy();
-      final ctx = RetryContext(0, -1, GeneralError('x'));
+      final ctx = RetryContext(0, -1,
+          SignalRException(message: 'x', type: SignalRExceptionType.signalr));
       expect(policy.nextRetryDelayInMilliseconds(ctx), isNull);
     });
 
     test('custom delays: stops at appended null sentinel', () {
-      final policy = DefaultRetryPolicy(retryDelays: [100, 200], jitterFactor: 0.0);
-      expect(policy.nextRetryDelayInMilliseconds(
-            RetryContext(0, 0, GeneralError('a')),
+      final policy =
+          DefaultRetryPolicy(retryDelays: [100, 200], jitterFactor: 0.0);
+      expect(
+          policy.nextRetryDelayInMilliseconds(
+            RetryContext(
+                0,
+                0,
+                SignalRException(
+                    message: 'a', type: SignalRExceptionType.signalr)),
           ),
           100);
-      expect(policy.nextRetryDelayInMilliseconds(
-            RetryContext(0, 1, GeneralError('a')),
+      expect(
+          policy.nextRetryDelayInMilliseconds(
+            RetryContext(
+                0,
+                1,
+                SignalRException(
+                    message: 'a', type: SignalRExceptionType.signalr)),
           ),
           200);
-      expect(policy.nextRetryDelayInMilliseconds(
-            RetryContext(0, 2, GeneralError('a')),
+      expect(
+          policy.nextRetryDelayInMilliseconds(
+            RetryContext(
+                0,
+                2,
+                SignalRException(
+                    message: 'a', type: SignalRExceptionType.signalr)),
           ),
           isNull);
-      expect(policy.nextRetryDelayInMilliseconds(
-            RetryContext(0, 3, GeneralError('a')),
+      expect(
+          policy.nextRetryDelayInMilliseconds(
+            RetryContext(
+                0,
+                3,
+                SignalRException(
+                    message: 'a', type: SignalRExceptionType.signalr)),
           ),
           isNull);
     });
@@ -66,7 +89,7 @@ void main() {
       expect(
         () => parseMessageTypeFromString(99),
         throwsA(
-          predicate<GeneralError>(
+          predicate<SignalRException>(
             (e) => e.toString().contains('99'),
           ),
         ),
@@ -194,8 +217,7 @@ void main() {
       );
       final written = protocol.writeMessage(msg);
       expect(written, isA<Uint8List>());
-      final parsed =
-          protocol.parseMessages(written as Uint8List, log);
+      final parsed = protocol.parseMessages(written as Uint8List, log);
       expect(parsed, hasLength(1));
       final back = parsed.single as InvocationMessage;
       expect(back.arguments, ['a', null, 7]);
@@ -210,8 +232,7 @@ void main() {
       );
       final written = protocol.writeMessage(msg);
       expect(written, isA<Uint8List>());
-      final parsed =
-          protocol.parseMessages(written as Uint8List, log);
+      final parsed = protocol.parseMessages(written as Uint8List, log);
       expect(parsed, hasLength(1));
       final back = parsed.single as StreamInvocationMessage;
       expect(back.arguments, [null, 'ok']);
@@ -225,8 +246,7 @@ void main() {
         streamIds: ['s1'],
       );
       final written = protocol.writeMessage(msg);
-      final parsed =
-          protocol.parseMessages(written as Uint8List, log);
+      final parsed = protocol.parseMessages(written as Uint8List, log);
       expect(parsed, hasLength(1));
       final back = parsed.single as StreamInvocationMessage;
       expect(back.arguments, [1, null]);

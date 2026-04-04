@@ -3,9 +3,8 @@ import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:sse_channel/sse_channel.dart';
 
-import '../core/errors.dart';
-import '../core/itransport.dart';
 import '../core/signalr_exception.dart';
+import '../core/itransport.dart';
 import '../protocol/signalr_http_client.dart';
 import '../shared/utils.dart';
 
@@ -39,7 +38,11 @@ class ServerSentEventsTransport implements ITransport {
     if (_onCloseRaised) return;
     _onCloseRaised = true;
 
-    final Exception? ex = error == null ? null : toSignalRException(error, st);
+    final Exception? ex = SignalRException.tryHandler(
+        error: error,
+        message: error?.toString() ?? '',
+        type: SignalRExceptionType.signalr,
+        stackTrace: st);
     onClose?.call(error: ex);
   }
 
@@ -65,8 +68,10 @@ class ServerSentEventsTransport implements ITransport {
 
     if (transferFormat != TransferFormat.text) {
       return Future.error(
-        GeneralError(
-          "The Server-Sent Events transport only supports the 'Text' transfer format",
+        SignalRException(
+          message:
+              "The Server-Sent Events transport only supports the 'Text' transfer format",
+          type: SignalRExceptionType.signalr,
         ),
       );
     }
@@ -87,13 +92,23 @@ class ServerSentEventsTransport implements ITransport {
               );
               recv(data);
             } catch (error, st) {
-              unawaited(_close(error: toSignalRException(error, st)));
+              unawaited(_close(
+                  error: SignalRException.handler(
+                      error: error,
+                      message: error.toString(),
+                      type: SignalRExceptionType.signalr,
+                      stackTrace: st)));
             }
           }
         },
         onError: (Object e, StackTrace st) {
           _logger.severe('(SSE transport) error when listening to stream: $e');
-          unawaited(_close(error: toSignalRException(e, st)));
+          unawaited(_close(
+              error: SignalRException.handler(
+                  error: e,
+                  message: e.toString(),
+                  type: SignalRExceptionType.signalr,
+                  stackTrace: st)));
         },
         onDone: () {
           unawaited(_close());
@@ -101,7 +116,11 @@ class ServerSentEventsTransport implements ITransport {
         cancelOnError: false,
       );
     } catch (e, st) {
-      return Future.error(toSignalRException(e, st));
+      return Future.error(SignalRException.handler(
+          error: e,
+          message: e.toString(),
+          type: SignalRExceptionType.signalr,
+          stackTrace: st));
     }
   }
 
@@ -109,7 +128,9 @@ class ServerSentEventsTransport implements ITransport {
   Future<void> send(Object data) async {
     if (_sseClient == null) {
       return Future.error(
-        GeneralError("Cannot send until the transport is connected"),
+        SignalRException(
+            message: "Cannot send until the transport is connected",
+            type: SignalRExceptionType.signalr),
       );
     }
     await sendMessage(

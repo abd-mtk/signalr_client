@@ -3,9 +3,8 @@ import 'dart:convert';
 
 import 'package:logging/logging.dart';
 
-import '../core/errors.dart';
-import '../core/iconnection.dart';
 import '../core/signalr_exception.dart';
+import '../core/iconnection.dart';
 import '../core/itransport.dart';
 import '../infrastructure/long_polling_transport.dart';
 import '../infrastructure/server_sent_events_transport.dart';
@@ -66,8 +65,10 @@ class HttpConnection implements IConnection {
     );
 
     if (_connectionState != ConnectionState.disconnected) {
-      return Future.error(GeneralError(
-        "Cannot start a connection that is not in the 'Disconnected' state.",
+      return Future.error(SignalRException(
+        message:
+            "Cannot start a connection that is not in the 'Disconnected' state.",
+        type: SignalRExceptionType.signalr,
       ));
     }
 
@@ -81,12 +82,14 @@ class HttpConnection implements IConnection {
           "Failed to start the HttpConnection before stop() was called.";
       _logger.severe(message);
       await _stopPromise;
-      return Future.error(GeneralError(message));
+      return Future.error(SignalRException(
+          message: message, type: SignalRExceptionType.signalr));
     } else if (_connectionState != ConnectionState.connected) {
       const message =
           "HttpConnection.startInternal completed gracefully but didn't enter the connection into the connected state!";
       _logger.severe(message);
-      return Future.error(GeneralError(message));
+      return Future.error(SignalRException(
+          message: message, type: SignalRExceptionType.signalr));
     }
 
     _connectionStarted = true;
@@ -95,15 +98,19 @@ class HttpConnection implements IConnection {
   @override
   Future<void> send(Object? data) {
     if (_connectionState != ConnectionState.connected) {
-      return Future.error(GeneralError(
-        "Cannot send data if the connection is not in the 'Connected' State.",
+      return Future.error(SignalRException(
+        message:
+            "Cannot send data if the connection is not in the 'Connected' State.",
+        type: SignalRExceptionType.signalr,
       ));
     }
 
     final activeTransport = _transport;
     if (activeTransport == null) {
       return Future.error(
-        GeneralError('Transport is not available in the Connected state.'),
+        SignalRException(
+            message: 'Transport is not available in the Connected state.',
+            type: SignalRExceptionType.signalr),
       );
     }
     var queue = _sendQueue;
@@ -116,7 +123,11 @@ class HttpConnection implements IConnection {
 
   @override
   Future<void>? stop({Object? error}) async {
-    final Exception? ex = error == null ? null : toSignalRException(error);
+    final Exception? ex = SignalRException.tryHandler(
+        error: error,
+        message: error?.toString() ?? '',
+        type: SignalRExceptionType.signalr,
+        stackTrace: null);
 
     if (_connectionState == ConnectionState.disconnected) {
       _logger.finer(
@@ -171,8 +182,9 @@ class HttpConnection implements IConnection {
   Future<void> _startInternal(TransferFormat transferFormat) async {
     final resolvedBase = baseUrl;
     if (resolvedBase == null || resolvedBase.isEmpty) {
-      return Future.error(GeneralError(
-        'HttpConnection baseUrl is not set or is empty.',
+      return Future.error(SignalRException(
+        message: 'HttpConnection baseUrl is not set or is empty.',
+        type: SignalRExceptionType.signalr,
       ));
     }
     var url = resolvedBase;
@@ -184,8 +196,10 @@ class HttpConnection implements IConnection {
           _transport = _constructTransport(HttpTransportType.webSockets);
           await _startTransport(url, transferFormat);
         } else {
-          throw GeneralError(
-            "Negotiation can only be skipped when using the WebSocket transport directly.",
+          throw SignalRException(
+            message:
+                "Negotiation can only be skipped when using the WebSocket transport directly.",
+            type: SignalRExceptionType.signalr,
           );
         }
       } else {
@@ -196,18 +210,23 @@ class HttpConnection implements IConnection {
           negotiateResponse = await _getNegotiationResponse(url);
           if (_connectionState == ConnectionState.disconnecting ||
               _connectionState == ConnectionState.disconnected) {
-            throw GeneralError(
-                "The connection was stopped during negotiation.");
+            throw SignalRException(
+                message: "The connection was stopped during negotiation.",
+                type: SignalRExceptionType.signalr);
           }
 
           if (negotiateResponse.isErrorResponse) {
-            throw GeneralError(negotiateResponse.error);
+            throw SignalRException(
+                message: negotiateResponse.error ?? 'Unknown negotiation error',
+                type: SignalRExceptionType.signalr);
           }
 
           if (negotiateResponse.isRedirectResponse) {
             final nextUrl = negotiateResponse.url;
             if (nextUrl == null || nextUrl.isEmpty) {
-              throw GeneralError('Negotiate redirect response missing url.');
+              throw SignalRException(
+                  message: 'Negotiate redirect response missing url.',
+                  type: SignalRExceptionType.signalr);
             }
             url = nextUrl;
           }
@@ -223,7 +242,9 @@ class HttpConnection implements IConnection {
 
         if (redirects == _options.maxRedirects &&
             negotiateResponse.isRedirectResponse) {
-          throw GeneralError("Negotiate redirection limit exceeded.");
+          throw SignalRException(
+              message: "Negotiate redirection limit exceeded.",
+              type: SignalRExceptionType.signalr);
         }
 
         await _createTransport(
@@ -276,14 +297,19 @@ class HttpConnection implements IConnection {
       final response = await _httpClient.post(negotiateUrl, options: options);
 
       if (response.statusCode != 200) {
-        return Future.error(GeneralError(
-          "Unexpected status code returned from negotiate ${response.statusCode}",
+        return Future.error(SignalRException(
+          message:
+              "Unexpected status code returned from negotiate ${response.statusCode}",
+          type: SignalRExceptionType.http,
+          statusCode: response.statusCode,
         ));
       }
 
       if (response.content is! String) {
         return Future.error(
-          GeneralError("Negotation response content must be a json."),
+          SignalRException(
+              message: "Negotation response content must be a json.",
+              type: SignalRExceptionType.invalidPayload),
         );
       }
 
@@ -309,8 +335,10 @@ class HttpConnection implements IConnection {
 
     final base = url;
     if (base == null) {
-      throw GeneralError(
-        'Cannot build connect URL with connection token without a base url.',
+      throw SignalRException(
+        message:
+            'Cannot build connect URL with connection token without a base url.',
+        type: SignalRExceptionType.signalr,
       );
     }
     return "$base${base.contains('?') ? '&' : '?'}id=$connectionToken";
@@ -354,8 +382,9 @@ class HttpConnection implements IConnection {
       if (negotiate == null) {
         final negotiateBaseUrl = url;
         if (negotiateBaseUrl == null) {
-          return Future.error(GeneralError(
-            'Cannot re-negotiate: connection URL is missing.',
+          return Future.error(SignalRException(
+            message: 'Cannot re-negotiate: connection URL is missing.',
+            type: SignalRExceptionType.signalr,
           ));
         }
         try {
@@ -381,18 +410,23 @@ class HttpConnection implements IConnection {
           const message =
               "Failed to select transport before stop() was called.";
           _logger.finer(message);
-          return Future.error(GeneralError(message));
+          return Future.error(SignalRException(
+              message: message, type: SignalRExceptionType.signalr));
         }
       }
     }
 
     if (transportExceptions.isNotEmpty) {
-      return Future.error(GeneralError(
-        "Unable to connect to the server with any of the available transports. ${transportExceptions.join(" ")}",
+      return Future.error(SignalRException(
+        message:
+            "Unable to connect to the server with any of the available transports. ${transportExceptions.join(" ")}",
+        type: SignalRExceptionType.signalr,
       ));
     }
-    return Future.error(GeneralError(
-      "None of the transports supported by the client are supported by the server.",
+    return Future.error(SignalRException(
+      message:
+          "None of the transports supported by the client are supported by the server.",
+      type: SignalRExceptionType.signalr,
     ));
   }
 
@@ -421,7 +455,9 @@ class HttpConnection implements IConnection {
           pollTimeoutMs: _options.longPollingTimeoutMs,
         );
       default:
-        throw GeneralError("Unknown transport: $transport.");
+        throw SignalRException(
+            message: "Unknown transport: $transport.",
+            type: SignalRExceptionType.signalr);
     }
   }
 
@@ -429,7 +465,9 @@ class HttpConnection implements IConnection {
     final t = _transport;
     if (t == null) {
       return Future.error(
-        GeneralError('Cannot start transport: transport is null.'),
+        SignalRException(
+            message: 'Cannot start transport: transport is null.',
+            type: SignalRExceptionType.signalr),
       );
     }
     t.onReceive = onreceive;
@@ -447,8 +485,10 @@ class HttpConnection implements IConnection {
       _logger.finer(
         "Skipping transport '${endpoint.transport}' because it is not supported by this client.",
       );
-      throw GeneralError(
-        "Skipping transport '${endpoint.transport}' because it is not supported by this client.",
+      throw SignalRException(
+        message:
+            "Skipping transport '${endpoint.transport}' because it is not supported by this client.",
+        type: SignalRExceptionType.signalr,
       );
     }
     if (transportMatches(requestedTransport, transport)) {
@@ -460,15 +500,19 @@ class HttpConnection implements IConnection {
       _logger.finer(
         "Skipping transport '$transport' because it does not support the requested transfer format '$requestedTransferFormat'.",
       );
-      throw GeneralError(
-        "Skipping transport '$transport' because it does not support the requested transfer format '$requestedTransferFormat'.",
+      throw SignalRException(
+        message:
+            "Skipping transport '$transport' because it does not support the requested transfer format '$requestedTransferFormat'.",
+        type: SignalRExceptionType.signalr,
       );
     }
     _logger.finer(
       "Skipping transport '$transport' because it was disabled by the client.",
     );
-    throw GeneralError(
-      "Skipping transport '$transport' because it was disabled by the client.",
+    throw SignalRException(
+      message:
+          "Skipping transport '$transport' because it was disabled by the client.",
+      type: SignalRExceptionType.signalr,
     );
   }
 

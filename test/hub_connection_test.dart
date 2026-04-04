@@ -129,8 +129,8 @@ void main() {
       var called = false;
       hub.on('MyMethod', (_) => called = true);
 
-      fakeConnection.receive(
-          '{"type":1,"target":"mymethod","arguments":[]}\u001e');
+      fakeConnection
+          .receive('{"type":1,"target":"mymethod","arguments":[]}\u001e');
       expect(called, isTrue);
     });
 
@@ -141,13 +141,11 @@ void main() {
       void handler(List<Object?>? args) => callCount++;
 
       hub.on('Foo', handler);
-      fakeConnection.receive(
-          '{"type":1,"target":"Foo","arguments":[]}\u001e');
+      fakeConnection.receive('{"type":1,"target":"Foo","arguments":[]}\u001e');
       expect(callCount, 1);
 
       hub.off('Foo', method: handler);
-      fakeConnection.receive(
-          '{"type":1,"target":"Foo","arguments":[]}\u001e');
+      fakeConnection.receive('{"type":1,"target":"Foo","arguments":[]}\u001e');
       expect(callCount, 1); // Not called again
     });
   });
@@ -188,7 +186,8 @@ void main() {
     });
 
     test('custom retry delays are respected', () {
-      final policy = DefaultRetryPolicy(retryDelays: [100, 500], jitterFactor: 0.0);
+      final policy =
+          DefaultRetryPolicy(retryDelays: [100, 500], jitterFactor: 0.0);
       expect(
         policy.nextRetryDelayInMilliseconds(RetryContext(0, 0, Exception())),
         100,
@@ -218,7 +217,7 @@ void main() {
       // 4th exceeds maxBufferSize of 3
       expect(
         () => queue.send('d'),
-        throwsA(isA<GeneralError>()),
+        throwsA(isA<SignalRException>()),
       );
 
       await queue.stop();

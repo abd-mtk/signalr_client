@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:http/http.dart';
 import 'package:logging/logging.dart';
 
-import '../core/errors.dart';
 import '../core/signalr_exception.dart';
 import '../protocol/ihub_protocol.dart';
 import '../protocol/signalr_http_client.dart';
@@ -39,7 +38,8 @@ class WebSupportingHttpClient extends SignalRHttpClient {
   Future<SignalRHttpResponse> send(SignalRHttpRequest request) {
     final abortEarly = request.abortSignal;
     if (abortEarly != null && abortEarly.aborted) {
-      return Future.error(AbortError());
+      return Future.error(SignalRException(
+          message: "An abort occurred.", type: SignalRExceptionType.abort));
     }
 
     final method = request.method;
@@ -64,7 +64,9 @@ class WebSupportingHttpClient extends SignalRHttpClient {
         if (sig != null) {
           sig.onabort = () {
             if (!completer.isCompleted) {
-              completer.completeError(AbortError());
+              completer.completeError(SignalRException(
+                  message: "An abort occurred.",
+                  type: SignalRExceptionType.abort));
             }
           };
         }
@@ -79,9 +81,7 @@ class WebSupportingHttpClient extends SignalRHttpClient {
       headers.setHeaderValue('X-Requested-With', 'FlutterHttpClient');
       headers.setHeaderValue(
         'content-type',
-        isJson
-            ? 'application/json;charset=UTF-8'
-            : 'text/plain;charset=UTF-8',
+        isJson ? 'application/json;charset=UTF-8' : 'text/plain;charset=UTF-8',
       );
       headers.addMessageHeaders(request.headers);
 
@@ -132,10 +132,18 @@ class WebSupportingHttpClient extends SignalRHttpClient {
             content: httpResp.body,
           );
         }
-        throw HttpError(httpResp.reasonPhrase, httpResp.statusCode);
+        throw SignalRException(
+          message: "${httpResp.statusCode}: ${httpResp.reasonPhrase}",
+          type: SignalRExceptionType.http,
+          statusCode: httpResp.statusCode,
+        );
       } catch (e, st) {
         clearAbortHandler();
-        throw toSignalRException(e, st);
+        throw SignalRException.handler(
+            error: e,
+            message: e.toString(),
+            type: SignalRExceptionType.signalr,
+            stackTrace: st);
       }
     });
   }
@@ -187,7 +195,8 @@ class WebSupportingHttpClient extends SignalRHttpClient {
     if (timeoutMs != null && timeoutMs > 0) {
       httpResponse = httpResponse.timeout(
         Duration(milliseconds: timeoutMs),
-        onTimeout: () => throw TimeoutError(),
+        onTimeout: () => throw SignalRException(
+            message: "A timeout occurred.", type: SignalRExceptionType.timeout),
       );
     }
 

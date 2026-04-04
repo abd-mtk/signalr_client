@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:logging/logging.dart';
 
-import '../core/errors.dart';
+import '../core/signalr_exception.dart';
 import '../core/itransport.dart';
 import '../shared/utils.dart';
 import 'ihub_protocol.dart';
@@ -35,8 +35,9 @@ class JsonHubProtocol implements IHubProtocol {
   List<HubMessageBase> parseMessages(Object input, Logger logger) {
     // Only JsonContent is allowed.
     if (input is! String) {
-      throw GeneralError(
-          "Invalid input for JSON hub protocol. Expected a string.");
+      throw SignalRException(
+          message: "Invalid input for JSON hub protocol. Expected a string.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     final jsonInput = input;
@@ -157,7 +158,9 @@ class JsonHubProtocol implements IHubProtocol {
     _assertNotEmptyString(
         message.invocationId, "Invalid payload for StreamItem message.");
     if (message.item == null) {
-      throw InvalidPayloadException("Invalid payload for StreamItem message.");
+      throw SignalRException(
+          message: "Invalid payload for StreamItem message.",
+          type: SignalRExceptionType.invalidPayload);
     }
     return message;
   }
@@ -173,7 +176,9 @@ class JsonHubProtocol implements IHubProtocol {
         invocationId: jsonData["invocationId"] as String?);
 
     if ((message.result != null) && (message.error != null)) {
-      throw InvalidPayloadException("Invalid payload for Completion message.");
+      throw SignalRException(
+          message: "Invalid payload for Completion message.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     if ((message.result == null) && (message.error != null)) {
@@ -206,12 +211,15 @@ class JsonHubProtocol implements IHubProtocol {
 
   static dynamic _messageAsMap(dynamic message) {
     if (message == null) {
-      throw GeneralError("Cannot encode message which is null.");
+      throw SignalRException(
+          message: "Cannot encode message which is null.",
+          type: SignalRExceptionType.invalidPayload);
     }
 
     if (message is! HubMessageBase) {
-      throw GeneralError(
-        "Cannot encode message of type '${message.runtimeType}'.",
+      throw SignalRException(
+        message: "Cannot encode message of type '${message.runtimeType}'.",
+        type: SignalRExceptionType.invalidPayload,
       );
     }
 
@@ -250,8 +258,10 @@ class JsonHubProtocol implements IHubProtocol {
 
     if (message is CompletionMessage) {
       if (message.error != null && message.result != null) {
-        throw GeneralError(
-          "Completion message must contain either 'error' or 'result'.",
+        throw SignalRException(
+          message:
+              "Completion message must contain either 'error' or 'result'.",
+          type: SignalRExceptionType.invalidPayload,
         );
       }
       final r = {
@@ -280,12 +290,15 @@ class JsonHubProtocol implements IHubProtocol {
       return {"type": messageType, "invocationId": message.invocationId};
     }
 
-    throw GeneralError("Converting '${message.type}' is not implemented.");
+    throw SignalRException(
+        message: "Converting '${message.type}' is not implemented.",
+        type: SignalRExceptionType.notImplemented);
   }
 
   static void _assertNotEmptyString(String? value, String errorMessage) {
     if (isStringEmpty(value)) {
-      throw InvalidPayloadException(errorMessage);
+      throw SignalRException(
+          message: errorMessage, type: SignalRExceptionType.invalidPayload);
     }
   }
 }

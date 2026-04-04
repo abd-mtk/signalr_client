@@ -2,7 +2,7 @@ import 'package:logging/logging.dart';
 
 import '../connection/http_connection.dart';
 import '../connection/http_connection_options.dart';
-import '../core/errors.dart';
+import '../core/signalr_exception.dart';
 import '../core/iretry_policy.dart';
 import '../core/itransport.dart';
 import '../di/signalr_locator.dart';
@@ -32,7 +32,9 @@ class HubConnectionBuilder {
     HttpTransportType? transportType,
   }) {
     if (isStringEmpty(url)) {
-      throw GeneralError('HubConnectionBuilder.withUrl requires a non-empty url.');
+      throw SignalRException(
+          message: 'HubConnectionBuilder.withUrl requires a non-empty url.',
+          type: SignalRExceptionType.signalr);
     }
     if (options != null && transportType != null) {
       throw ArgumentError(
@@ -79,18 +81,18 @@ class HubConnectionBuilder {
     final baseOptions = _httpConnectionOptions ?? HttpConnectionOptions();
     final Logger effectiveLogger =
         _configureLoggingOverride ?? baseOptions.logger;
-    final httpConnectionOptions =
-        baseOptions.copyWith(logger: effectiveLogger);
+    final httpConnectionOptions = baseOptions.copyWith(logger: effectiveLogger);
 
     final hubUrl = _url;
     if (hubUrl == null || hubUrl.isEmpty) {
-      throw GeneralError(
-        "The 'HubConnectionBuilder.withUrl' method must be called before building the connection.",
+      throw SignalRException(
+        message:
+            "The 'HubConnectionBuilder.withUrl' method must be called before building the connection.",
+        type: SignalRExceptionType.signalr,
       );
     }
 
-    final connection =
-        HttpConnection(hubUrl, options: httpConnectionOptions);
+    final connection = HttpConnection(hubUrl, options: httpConnectionOptions);
     return HubConnection.create(
       connection,
       httpConnectionOptions.logger,

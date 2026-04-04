@@ -5,9 +5,8 @@ import 'package:logging/logging.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../core/errors.dart';
-import '../core/itransport.dart';
 import '../core/signalr_exception.dart';
+import '../core/itransport.dart';
 import '../protocol/ihub_protocol.dart';
 import '../shared/utils.dart';
 
@@ -112,13 +111,21 @@ class WebSocketTransport implements ITransport {
                 "(WebSockets transport) error calling onReceive, error: $error",
               );
               unawaited(_closeInternal(
-                error: toSignalRException(error, st),
+                error: SignalRException.handler(
+                    error: error,
+                    message: error.toString(),
+                    type: SignalRExceptionType.signalr,
+                    stackTrace: st),
               ));
             }
           }
         },
         onError: (Object? error, StackTrace st) {
-          final ex = toSignalRException(error, st);
+          final ex = SignalRException.handler(
+              error: error,
+              message: error.toString(),
+              type: SignalRExceptionType.signalr,
+              stackTrace: st);
           if (!websocketCompleter.isCompleted) {
             websocketCompleter.completeError(ex);
           } else if (_connectFutureCompleted) {
@@ -133,7 +140,9 @@ class WebSocketTransport implements ITransport {
           } else {
             if (!websocketCompleter.isCompleted) {
               websocketCompleter.completeError(
-                GeneralError("There was an error with the transport."),
+                SignalRException(
+                    message: "There was an error with the transport.",
+                    type: SignalRExceptionType.signalr),
               );
             }
           }
@@ -142,7 +151,11 @@ class WebSocketTransport implements ITransport {
       );
     } catch (e, st) {
       if (!websocketCompleter.isCompleted) {
-        websocketCompleter.completeError(toSignalRException(e, st));
+        websocketCompleter.completeError(SignalRException.handler(
+            error: e,
+            message: e.toString(),
+            type: SignalRExceptionType.signalr,
+            stackTrace: st));
       }
       _logger.severe("WebSocket connection to '$safeUrl' failed: $e");
     }
@@ -184,14 +197,18 @@ class WebSocketTransport implements ITransport {
       } else if (data is Uint8List) {
         socket.sink.add(data);
       } else {
-        throw GeneralError("Content type is not handled.");
+        throw SignalRException(
+            message: "Content type is not handled.",
+            type: SignalRExceptionType.signalr);
       }
 
       return Future.value();
     }
 
     return Future.error(
-      GeneralError("WebSocket is not in the OPEN state"),
+      SignalRException(
+          message: "WebSocket is not in the OPEN state",
+          type: SignalRExceptionType.signalr),
     );
   }
 

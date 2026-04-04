@@ -2,7 +2,7 @@ import 'dart:collection';
 
 import 'package:logging/logging.dart';
 
-import '../core/errors.dart';
+import '../core/signalr_exception.dart';
 import '../core/itransport.dart';
 
 /// Defines the type of a Hub Message.
@@ -46,7 +46,9 @@ MessageType? parseMessageTypeFromString(int? value) {
     case 7:
       return MessageType.close;
     default:
-      throw GeneralError('A MessageType of $value is not supported.');
+      throw SignalRException(
+          message: 'A MessageType of $value is not supported.',
+          type: SignalRExceptionType.signalr);
   }
 }
 

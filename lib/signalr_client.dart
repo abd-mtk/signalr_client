@@ -1,11 +1,10 @@
 library;
 
 export 'src/core/abort_controller.dart';
-export 'src/core/errors.dart';
+export 'src/core/signalr_exception.dart';
 export 'src/core/iconnection.dart';
 export 'src/core/iretry_policy.dart';
 export 'src/core/itransport.dart';
-export 'src/core/signalr_exception.dart';
 export 'src/di/signalr_locator.dart';
 export 'src/connection/http_connection.dart';
 export 'src/connection/http_connection_options.dart';

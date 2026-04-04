@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:signalr_netcore/errors.dart';
 import 'package:signalr_netcore/ihub_protocol.dart';
+import 'package:signalr_netcore/src/core/signalr_exception.dart';
 import 'package:signalr_netcore/msgpack_hub_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:collection/collection.dart';
@@ -180,7 +181,7 @@ void main() {
       expect(
           () => protocol.parseMessages(
               Uint8List.fromList(payload), Logger("MessagepackHubProtocol")),
-          throwsA(predicate((e) => e is GeneralError)));
+          throwsA(predicate((e) => e is SignalRException)));
     });
   }
 

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'errors.dart';
+import 'signalr_exception.dart';
 
 /// Specifies a specific HTTP transport type.
 enum HttpTransportType {
@@ -14,7 +14,12 @@ enum HttpTransportType {
   serverSentEvents,
 
   /// Specifies the Long Polling transport.
-  longPolling,
+  longPolling;
+
+  bool get isNone => this == HttpTransportType.none;
+  bool get isWebSockets => this == HttpTransportType.webSockets;
+  bool get isServerSentEvents => this == HttpTransportType.serverSentEvents;
+  bool get isLongPolling => this == HttpTransportType.longPolling;
 }
 
 HttpTransportType httpTransportTypeFromString(String? value) {
@@ -31,7 +36,9 @@ HttpTransportType httpTransportTypeFromString(String? value) {
     case "LONGPOLLING":
       return HttpTransportType.longPolling;
     default:
-      throw GeneralError("$value is not a supported HttpTransportType");
+      throw SignalRException(
+          message: "$value is not a supported HttpTransportType",
+          type: SignalRExceptionType.signalr);
   }
 }
 
@@ -59,7 +66,9 @@ TransferFormat getTransferFormatFromString(String? value) {
     case "BINARY":
       return TransferFormat.binary;
     default:
-      throw GeneralError("$value is not a supported TransferFormat");
+      throw SignalRException(
+          message: "$value is not a supported TransferFormat",
+          type: SignalRExceptionType.signalr);
   }
 }
 
