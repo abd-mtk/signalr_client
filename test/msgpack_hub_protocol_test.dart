@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:signalr_netcore/errors.dart';
 import 'package:signalr_netcore/ihub_protocol.dart';
+import 'package:signalr_netcore/src/core/signalr_exception.dart';
 import 'package:signalr_netcore/msgpack_hub_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:collection/collection.dart';
@@ -14,7 +15,7 @@ void main() {
   group('Msgpack hub protocol -> ', () {
     final headers = MessageHeaders();
     headers.setHeaderValue("foo", "bar");
-    [
+    for (var e in [
       InvocationMessage(
         target: "myMethod",
         arguments: [
@@ -49,10 +50,10 @@ void main() {
         invocationId: "123",
         streamIds: [],
       )
-    ].forEach((e) {
+    ]) {
       test('can write/read non-blocking Invocation message -> ', () {
         final invocation = e;
-        final protocol = new MessagePackHubProtocol();
+        final protocol = MessagePackHubProtocol();
         final writtenMsg = protocol.writeMessage(invocation);
         final parsedMessages = protocol.parseMessages(
             writtenMsg, Logger("MessagepackHubProtocol"));
@@ -61,9 +62,9 @@ void main() {
             deepEq(parsedMessages.toString(), ([invocation]).toString());
         expect(equalityCheck, true);
       });
-    });
+    }
 
-    [
+    for (var e in [
       CompletionMessage(
         error: "Err",
         headers: MessageHeaders(),
@@ -74,9 +75,9 @@ void main() {
         invocationId: "abc",
         result: "OK",
       )
-    ].forEach((e) {
+    ]) {
       test('Completion message -> ', () {
-        final protocol = new MessagePackHubProtocol();
+        final protocol = MessagePackHubProtocol();
         final msg = e;
         final writtenMessage = protocol.writeMessage(msg);
         final parsedMessages = protocol.parseMessages(
@@ -85,9 +86,9 @@ void main() {
             deepEq(parsedMessages.toString(), ([msg]).toString());
         expect(equalityCheck, true);
       });
-    });
+    }
     test('Ping message -> ', () {
-      final protocol = new MessagePackHubProtocol();
+      final protocol = MessagePackHubProtocol();
       final buf = [
         0x02, // length prefix
         0x91, // message array length = 1 (fixarray)
@@ -103,7 +104,7 @@ void main() {
     });
 
     test('Cancel message -> ', () {
-      final protocol = new MessagePackHubProtocol();
+      final protocol = MessagePackHubProtocol();
       final buf = [
         0x07, // length prefix
         0x93, // message array length = 1 (fixarray)
@@ -122,7 +123,7 @@ void main() {
     });
   });
 
-  [
+  for (var e in [
     /*
     [
       "message with no payload",
@@ -171,21 +172,21 @@ void main() {
       [0x05, 0x94, 0x03, 0x80, 0xa0, 0x03],
       "Invalid payload for Completion message."
     ],
-  ].forEach((e) {
+  ]) {
     final name = e[0];
     final payload = e[1] as List<int>;
     test('$name -> ', () {
-      final protocol = new MessagePackHubProtocol();
+      final protocol = MessagePackHubProtocol();
 
       expect(
           () => protocol.parseMessages(
               Uint8List.fromList(payload), Logger("MessagepackHubProtocol")),
-          throwsA(predicate((e) => e is GeneralError)));
+          throwsA(predicate((e) => e is SignalRException)));
     });
-  });
+  }
 
   test('can read multiple messages -> ', () {
-    final protocol = new MessagePackHubProtocol();
+    final protocol = MessagePackHubProtocol();
     final payload = [
       0x08,
       0x94,

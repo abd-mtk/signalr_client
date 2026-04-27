@@ -69,7 +69,7 @@ void main() {
         expect(e.toString(), 'Exception: Cannot read message size.');
         return;
       }
-      throw new Exception("Expected ArgumentError");
+      throw Exception("Expected ArgumentError");
     });
 
     test('Cannot read size -> ', () {
@@ -81,7 +81,7 @@ void main() {
         expect(e.toString(), 'Exception: Cannot read message size.');
         return;
       }
-      throw new Exception("Expected ArgumentError");
+      throw Exception("Expected ArgumentError");
     });
 
     test('Cannot read size -> ', () {
@@ -103,7 +103,7 @@ void main() {
         expect(e.toString(), 'Exception: Cannot read message size.');
         return;
       }
-      throw new Exception("Expected ArgumentError");
+      throw Exception("Expected ArgumentError");
     });
 
     test('Cannot read size -> ', () {
@@ -125,7 +125,7 @@ void main() {
         expect(e.toString(), 'Exception: Incomplete message.');
         return;
       }
-      throw new Exception("Expected ArgumentError");
+      throw Exception("Expected ArgumentError");
     });
 
     test('Cannot read size -> ', () {
@@ -144,7 +144,7 @@ void main() {
             'Exception: Messages bigger than 2GB are not supported.');
         return;
       }
-      throw new Exception("Expected ArgumentError");
+      throw Exception("Expected ArgumentError");
     });
 
     test('Cannot read size -> ', () {
@@ -163,7 +163,7 @@ void main() {
             'Exception: Messages bigger than 2GB are not supported.');
         return;
       }
-      throw new Exception("Expected ArgumentError");
+      throw Exception("Expected ArgumentError");
     });
     test('Cannot read size -> ', () {
       final payload = Uint8List.fromList([
@@ -177,7 +177,7 @@ void main() {
         expect(e.toString(), 'Exception: Incomplete message.');
         return;
       }
-      throw new Exception("Expected ArgumentError");
+      throw Exception("Expected ArgumentError");
     });
     test('Cannot read size -> ', () {
       final payload = Uint8List.fromList([
@@ -194,7 +194,7 @@ void main() {
         expect(e.toString(), 'Exception: Incomplete message.');
         return;
       }
-      throw new Exception("Expected ArgumentError");
+      throw Exception("Expected ArgumentError");
     });
   });
 }

@@ -14,7 +14,7 @@ class TestsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vm = new TestsPageViewModel();
+    final vm = TestsPageViewModel();
     return TestsPageViewModelProvider(
         viewModel: vm,
         childBuilder: (ctx) {
@@ -120,7 +120,7 @@ class TestsPageView extends StatelessWidget {
                   viewModel: vm,
                   propertyName: TestsPageViewModel.hubLogMessagesPropName,
                   builder: (context, snapshot) {
-                    return new ListView.builder(
+                    return ListView.builder(
                         itemCount: vm.hubLogMessages.length,
                         itemBuilder: (BuildContext ctx, int index) =>
                             _createLogMessageItemView(

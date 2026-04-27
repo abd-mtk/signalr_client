@@ -13,7 +13,7 @@ void main() {
   group('Json hub protocol -> ', () {
     final headers = MessageHeaders();
     headers.setHeaderValue("foo", "bar");
-    [
+    for (var e in [
       InvocationMessage(
         target: "myMethod",
         arguments: [
@@ -47,10 +47,10 @@ void main() {
         ],
         invocationId: "123",
       )
-    ].forEach((e) {
+    ]) {
       test('can write/read non-blocking Invocation message -> ', () {
         final invocation = e;
-        final protocol = new JsonHubProtocol();
+        final protocol = JsonHubProtocol();
         final writtenMsg = protocol.writeMessage(invocation);
         final parsedMessages =
             protocol.parseMessages(writtenMsg, Logger("JsonHubProtocol"));
@@ -59,9 +59,9 @@ void main() {
             deepEq(parsedMessages.toString(), ([invocation]).toString());
         expect(equalityCheck, true);
       });
-    });
+    }
 
-    ([
+    for (var e in ([
       [
         TextMessageFormat.write(
             '{"type":3, "invocationId": "abc", "error": "Err", "result": null, "headers": {}}'),
@@ -99,9 +99,9 @@ void main() {
           result: null,
         )
       ],
-    ]).forEach((e) {
+    ])) {
       test('Completion message -> ', () {
-        final protocol = new JsonHubProtocol();
+        final protocol = JsonHubProtocol();
         final payload = e[0];
         final expectedMessage = e[1];
         final parsedMessages =
@@ -110,9 +110,9 @@ void main() {
             deepEq(parsedMessages.toString(), ([expectedMessage]).toString());
         expect(equalityCheck, true);
       });
-    });
+    }
 
-    [
+    for (var e in [
       [
         TextMessageFormat.write(
             '{"type":2, "invocationId": "abc", "headers": {}, "item": 8}'),
@@ -141,9 +141,9 @@ void main() {
         )
       ],
       [TextMessageFormat.write('{"type":6}'), PingMessage()]
-    ].forEach((e) {
+    ]) {
       test('StreamItem message -> ', () {
-        final protocol = new JsonHubProtocol();
+        final protocol = JsonHubProtocol();
         final payload = e[0];
         final expectedMessage = e[1];
         final parsedMessages =
@@ -151,6 +151,6 @@ void main() {
 
         expect(parsedMessages.toString(), [expectedMessage].toString());
       });
-    });
+    }
   });
 }

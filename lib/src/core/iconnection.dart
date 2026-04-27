@@ -1,12 +1,10 @@
 import 'dart:async';
 
-import "itransport.dart";
+import 'itransport.dart';
 
 class ConnectionFeatures {
-  // Properties
   bool? inherentKeepAlive;
 
-  // Methods
   ConnectionFeatures(this.inherentKeepAlive);
 }
 
@@ -18,7 +16,7 @@ abstract class IConnection {
 
   Future<void> start({TransferFormat? transferFormat});
   Future<void> send(Object? data);
-  Future<void>? stop({Exception? error});
+  Future<void>? stop({Object? error});
 
   OnReceive? onreceive;
   OnClose? onclose;

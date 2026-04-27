@@ -1,60 +1,74 @@
 import 'dart:async';
 
-import 'errors.dart';
+import 'signalr_exception.dart';
 
 /// Specifies a specific HTTP transport type.
 enum HttpTransportType {
-  /// Specified no transport preference. */
-  None, // = 0,
-  /// Specifies the WebSockets transport. */
-  WebSockets, // = 1,
-  /// Specifies the Server-Sent Events transport. */
-  ServerSentEvents, // = 2,
-  /// Specifies the Long Polling transport. */
-  LongPolling, // = 4,
+  /// Specified no transport preference.
+  none,
+
+  /// Specifies the WebSockets transport.
+  webSockets,
+
+  /// Specifies the Server-Sent Events transport.
+  serverSentEvents,
+
+  /// Specifies the Long Polling transport.
+  longPolling;
+
+  bool get isNone => this == HttpTransportType.none;
+  bool get isWebSockets => this == HttpTransportType.webSockets;
+  bool get isServerSentEvents => this == HttpTransportType.serverSentEvents;
+  bool get isLongPolling => this == HttpTransportType.longPolling;
 }
 
 HttpTransportType httpTransportTypeFromString(String? value) {
   if (value == null || value == "") {
-    return HttpTransportType.None;
+    return HttpTransportType.none;
   }
 
   value = value.toUpperCase();
   switch (value) {
     case "WEBSOCKETS":
-      return HttpTransportType.WebSockets;
+      return HttpTransportType.webSockets;
     case "SERVERSENTEVENTS":
-      return HttpTransportType.ServerSentEvents;
+      return HttpTransportType.serverSentEvents;
     case "LONGPOLLING":
-      return HttpTransportType.LongPolling;
+      return HttpTransportType.longPolling;
     default:
-      throw new GeneralError("$value is not a supported HttpTransportType");
+      throw SignalRException(
+          message: "$value is not a supported HttpTransportType",
+          type: SignalRExceptionType.signalr);
   }
 }
 
 /// Specifies the transfer format for a connection.
 enum TransferFormat {
   /// TransferFormat is not defined.
-  Undefined, // = 0,
+  undefined,
+
   /// Specifies that only text data will be transmitted over the connection.
-  Text, // = 1,
+  text,
+
   /// Specifies that binary data will be transmitted over the connection.
-  Binary, // = 2,
+  binary,
 }
 
 TransferFormat getTransferFormatFromString(String? value) {
   if (value == null || value == "") {
-    return TransferFormat.Undefined;
+    return TransferFormat.undefined;
   }
 
   value = value.toUpperCase();
   switch (value) {
     case "TEXT":
-      return TransferFormat.Text;
+      return TransferFormat.text;
     case "BINARY":
-      return TransferFormat.Binary;
+      return TransferFormat.binary;
     default:
-      throw new GeneralError("$value is not a supported HttpTransportType");
+      throw SignalRException(
+          message: "$value is not a supported TransferFormat",
+          type: SignalRExceptionType.signalr);
   }
 }
 
@@ -62,12 +76,11 @@ TransferFormat getTransferFormatFromString(String? value) {
 /// data: the content. Either a string (json) or Uint8List (binary)
 typedef OnReceive = void Function(Object? data);
 
-///
 typedef OnClose = void Function({Exception? error});
 
 typedef AccessTokenFactory = Future<String> Function();
 
-/// An abstraction over the behavior of transports. This is designed to support the framework and not intended for use by applications.
+/// An abstraction over the behavior of transports.
 abstract class ITransport {
   Future<void> connect(String? url, TransferFormat transferFormat);
 
